@@ -279,30 +279,42 @@ class LoginUser {
 
         ob_start();
         ?>
+        <!DOCTYPE html>
         <html>
             <head>
                 <meta charset="UTF-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <link rel="stylesheet" href="/bulma/css/bulma.min.css">
+
+                <!-- fusion-lib baseline -->
+                <link rel="stylesheet" href="/fusion-lib/css/fusion-plain.css">
+
                 <title>Login</title>
             </head>
             <body>
-                <div class="container" style="margin-top:3em;">
-                    <form method="post" class="box" style="max-width:400px;margin:auto">
+
+                <div class="fusion-page-center">
+                    <form method="post" class="fusion-card fusion-form fusion-login">
                         <input type="hidden" name="csrf" value="<?= $csrf ?>">
-                        <div class="field">
-                            <label class="label">Username</label>
-                            <input class="input" name="username" required>
+
+                        <div class="fusion-field">
+                            <label class="fusion-label">Username</label>
+                            <input class="fusion-input" name="username" required>
                         </div>
-                        <div class="field">
-                            <label class="label">Password</label>
-                            <input class="input" type="password" name="password" required>
+
+                        <div class="fusion-field">
+                            <label class="fusion-label">Password</label>
+                            <input class="fusion-input" type="password" name="password" required>
                         </div>
-                        <button class="button is-primary is-fullwidth">Login</button>
+
+                        <button class="fusion-btn fusion-btn-primary fusion-btn-block">
+                            Login
+                        </button>
                     </form>
                 </div>
+
             </body>
         </html>
+
         <?php
         return ob_get_clean();
     }
