@@ -13,7 +13,22 @@ Every file can be read, understood, debugged, and modified directly.
 The goal is not novelty — the goal is durability.
 
 ---
+## Project Status
 
+fusion-lib is under active development.
+
+The library is already used in real projects, but it is **not yet feature-complete**
+and may contain known or unknown defects. Documentation, CSS contracts, and
+component boundaries are still being refined.
+
+If you adopt fusion-lib today:
+- expect occasional breaking changes
+- expect missing polish
+- expect boring, readable code instead of abstractions
+
+This is intentional.
+
+---
 ## Usage Overview
 
 fusion-lib is **not installed**.  
