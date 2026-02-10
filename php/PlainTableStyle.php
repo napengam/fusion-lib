@@ -9,7 +9,7 @@ final class PlainTableStyle implements TableStyle {
     }
 
     public function thead(): string {
-        return '';
+      return 'fusion-thead';
     }
 
     public function headlineCell(): string {

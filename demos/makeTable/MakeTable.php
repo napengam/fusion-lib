@@ -1,32 +1,32 @@
 <?php
+
 declare(strict_types=1);
 
-final class MakeTable
-{
+class MakeTable {
+
     public string $title;
     public string $tableId = '';
-
     private array $out = [];
     private bool $hasHead = false;
     private int $numCols = 0;
     private string $footLine = '';
-    private TableStyle $style;
 
-    public function __construct(string $title, ?TableStyle $style = null)
-    {
+    public function __construct(string $title) {
         $this->title = $title;
-        $this->style = $style ?? new PlainTableStyle();
     }
 
-    public function outRow(array $line, string $attributes = ''): void
-    {
+    /**
+     * Output one row.
+     * First call initializes the table header.
+     */
+    public function outRow(array $line, string $attributes = ''): void {
         if (!$this->hasHead) {
             $this->initTable($line);
             return;
         }
 
-        $attr = $attributes !== '' ? " $attributes" : '';
-        $this->out[] = "<tr{$attr}>";
+        $attr = $attributes ? " $attributes" : '';
+        $this->out[] = "<tr class=\"fusion-row\"$attr>";
 
         foreach ($line as $cell) {
             $this->out[] = $this->renderCell($cell, 'td');
@@ -35,21 +35,20 @@ final class MakeTable
         $this->out[] = '</tr>';
     }
 
-    public function setHeadLine(string $headline): void
-    {
-        $this->out[2] =
-            "<tr><th colspan=\"{$this->numCols}\" class=\"{$this->style->headlineCell()}\">{$headline}</th></tr>";
+    public function setHeadLine(string $headline): void {
+        $this->out[2] = "<tr class=\"fusion-table-headline\">
+            <th colspan=\"{$this->numCols}\">$headline</th>
+        </tr>";
     }
 
-    public function setFootLine(string $footer): void
-    {
-        $this->footLine =
-            "<tr><th colspan=\"{$this->numCols}\">{$footer}</th></tr>";
+    public function setFootLine(string $footer): void {
+        $this->footLine = "<tr class=\"fusion-table-footer\">
+            <th colspan=\"{$this->numCols}\">$footer</th>
+        </tr>";
     }
 
-    public function closeTable(): string
-    {
-        if ($this->footLine !== '') {
+    public function closeTable(): string {
+        if ($this->footLine) {
             $this->out[] = $this->footLine;
         }
 
@@ -57,71 +56,64 @@ final class MakeTable
         return implode('', $this->out);
     }
 
-    // -------------------------------------------------
-    // Internals
-    // -------------------------------------------------
+    /* -------------------------------------------------
+     * Internals
+     * ------------------------------------------------- */
 
-    private function initTable(array $line): void
-    {
+    private function initTable(array $line): void {
         $this->hasHead = true;
-        $this->tableId = 'tt' . bin2hex(random_bytes(4));
+        $this->numCols = count($line);
+        $this->tableId = 'tt-' . bin2hex(random_bytes(4));
+        $filterId = "filter-{$this->tableId}";
 
-        $colspan  = count($line);
-        $filterId = "filter{$this->tableId}";
-
-        $this->out[] =
-            "<table id=\"{$this->tableId}\" class=\"{$this->style->table()}\">";
-
-        $this->out[] =
-            "<thead class=\"{$this->style->thead()}\">";
-
-        // Title row
         $this->out[] = <<<HTML
-<tr>
-    <th colspan="{$colspan}" class="{$this->style->headlineCell()}">
-        <span class="{$this->style->filterButton()}"
-              onclick="filterTable.filterOnOff('{$filterId}')">
-            {$this->style->icon('filter')}
-        </span>
-        {$this->title}
-        <span class="{$this->style->filterButton()}"
-              onclick="filterTable.filterOnOff('{$filterId}',1);window.print()">
-            {$this->style->icon('print')}
-        </span>
+<table id="{$this->tableId}" class="fusion-table">
+<thead class="fusion-table-head">
+<tr class="fusion-table-title">
+    <th colspan="{$this->numCols}">
+        <button class="fusion-btn fusion-btn-icon fusion-filter-toggle"
+                onclick="filterTable.filterOnOff('{$filterId}')"
+                aria-label="Filter"></button>
+
+        <span class="fusion-table-title-text">{$this->title}</span>
+
+        <button class="fusion-btn fusion-btn-icon fusion-print"
+                onclick="filterTable.filterOnOff('{$filterId}',1);window.print()"
+                aria-label="Print"></button>
     </th>
 </tr>
+
+<tr id="{$filterId}" class="fusion-filter-row" style="display:none">
 HTML;
 
-        // Filter row
-        $this->out[] = "<tr id=\"{$filterId}\" style=\"display:none\">";
-        foreach ($line as $i => $_) {
-            $this->out[] =
-                "<th><input class=\"{$this->style->filterInput()}\" " .
-                "onchange=\"filterTable.searchRows('{$filterId}')\" " .
-                "id=\"idtitle{$i}{$this->tableId}\" type=\"text\"></th>";
+        foreach ($line as $i => $cell) {
+            $this->out[] = <<<HTML
+<th>
+    <input class="fusion-filter-input"
+           type="text"
+           placeholder="filter…"
+           onchange="filterTable.searchRows('{$filterId}')">
+</th>
+HTML;
         }
-        $this->out[] = '</tr>';
 
-        // Header row
-        $this->out[] = '<tr>';
+        $this->out[] = '</tr><tr class="fusion-header-row">';
+
         foreach ($line as $cell) {
             $this->out[] = $this->renderCell($cell, 'th');
         }
-        $this->out[] = '</tr>';
 
-        $this->out[] = '</thead><tbody>';
-        $this->numCols = $colspan;
+        $this->out[] = '</tr></thead><tbody class="fusion-table-body">';
     }
 
-    private function renderCell(mixed $cell, string $tag): string
-    {
+    private function renderCell(mixed $cell, string $tag): string {
         if (!is_array($cell)) {
-            return "<{$tag}>" . htmlspecialchars((string)$cell) . "</{$tag}>";
+            return "<$tag>" . htmlspecialchars((string) $cell) . "</$tag>";
         }
 
         $attr = $cell['atrib'] ?? $cell[0] ?? '';
-        $val  = $cell['value'] ?? $cell[1] ?? '';
+        $val = $cell['value'] ?? $cell[1] ?? '';
 
-        return "<{$tag} {$attr}>{$val}</{$tag}>";
+        return "<$tag $attr>$val</$tag>";
     }
 }

@@ -1,0 +1,145 @@
+/* -------------------------------------------------
+   fusion-lib plain style
+   ------------------------------------------------- */
+
+.fusion-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: system-ui, sans-serif;
+    font-size: 0.9rem;
+    background: #fff;
+}
+
+.fusion-table th,
+.fusion-table td {
+    border: 1px solid #bbb;
+    padding: 0.4rem 0.5rem;
+    vertical-align: top;
+}
+
+.fusion-table-head {
+    background: #f0f0f0;
+}
+
+.fusion-header-row th {
+    background: #e6e6e6;
+    font-weight: 600;
+}
+
+.fusion-row:nth-child(even) {
+    background: #fafafa;
+}
+
+.fusion-row:hover {
+    background: #f2f6ff;
+}
+
+/* -------------------------------------------------
+   Title / controls
+   ------------------------------------------------- */
+
+.fusion-table-title th {
+    background: #ddd;
+    text-align: center;
+    font-weight: bold;
+}
+
+.fusion-table-title-text {
+    margin: 0 1rem;
+}
+
+.fusion-btn {
+    border: 1px solid #999;
+    background: #f5f5f5;
+    padding: 0.25rem 0.4rem;
+    cursor: pointer;
+}
+
+.fusion-btn:hover {
+    background: #e8e8e8;
+}
+
+.fusion-btn-icon::before {
+    content: "⛭";
+    font-size: 0.9em;
+}
+
+.fusion-print::before {
+    content: "🖨";
+}
+
+/* -------------------------------------------------
+   Filter row
+   ------------------------------------------------- */
+
+.fusion-filter-row th {
+    background: #f7f7f7;
+}
+
+.fusion-filter-input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0.25rem;
+    font-size: 0.85rem;
+}
+
+/* -------------------------------------------------
+   Footer
+   ------------------------------------------------- */
+
+.fusion-table-footer th {
+    background: #eee;
+    text-align: center;
+    font-weight: normal;
+}
+/* ===============================
+   Fusion Calendar (plain)
+   =============================== */
+
+.fusion-calendar {
+    border-collapse: collapse;
+    background: #fff;
+    font-size: 0.9rem;
+    border: 1px solid #444;
+}
+
+.fusion-calendar th,
+.fusion-calendar td {
+    border: 1px solid #ccc;
+    padding: 4px;
+    text-align: center;
+    cursor: pointer;
+}
+
+.fusion-calendar-head {
+    background: #eee;
+}
+
+.fusion-calendar-title {
+    font-weight: bold;
+}
+
+.fusion-calendar-prev,
+.fusion-calendar-next {
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.fusion-calendar-weekdays th {
+    background: #f5f5f5;
+    font-weight: normal;
+}
+
+.fusion-calendar-day:hover {
+    background: #e6f2ff;
+}
+
+.fusion-calendar-other {
+    color: #999;
+    background: #fafafa;
+}
+
+.fusion-calendar-has-entry {
+    background: #dff0d8;
+    font-weight: bold;
+}

@@ -1,10 +1,12 @@
 <?php
 
+declare(strict_types=1);
+
 class MakeTable {
 
     public string $title;
     public string $tableId = '';
-    public array $out = [];
+    private array $out = [];
     private bool $hasHead = false;
     private int $numCols = 0;
     private string $footLine = '';
@@ -13,6 +15,10 @@ class MakeTable {
         $this->title = $title;
     }
 
+    /**
+     * Output one row.
+     * First call initializes the table header.
+     */
     public function outRow(array $line, string $attributes = ''): void {
         if (!$this->hasHead) {
             $this->initTable($line);
@@ -20,7 +26,7 @@ class MakeTable {
         }
 
         $attr = $attributes ? " $attributes" : '';
-        $this->out[] = "<tr $attr>";
+        $this->out[] = "<tr class=\"fusion-row\"$attr>";
 
         foreach ($line as $cell) {
             $this->out[] = $this->renderCell($cell, 'td');
@@ -30,11 +36,15 @@ class MakeTable {
     }
 
     public function setHeadLine(string $headline): void {
-        $this->out[2] = "<tr><th colspan='{$this->numCols}'>$headline</th></tr>";
+        $this->out[2] = "<tr class=\"fusion-table-headline\">
+            <th colspan=\"{$this->numCols}\">$headline</th>
+        </tr>";
     }
 
     public function setFootLine(string $footer): void {
-        $this->footLine = "<tr><th colspan='{$this->numCols}'>$footer</th></tr>";
+        $this->footLine = "<tr class=\"fusion-table-footer\">
+            <th colspan=\"{$this->numCols}\">$footer</th>
+        </tr>";
     }
 
     public function closeTable(): string {
@@ -42,68 +52,65 @@ class MakeTable {
             $this->out[] = $this->footLine;
         }
 
-        $this->out[] = "</tbody></table>";
-
+        $this->out[] = '</tbody></table>';
         return implode('', $this->out);
     }
 
-    // -------------------------
-    // Helpers
-    // -------------------------
+    /* -------------------------------------------------
+     * Internals
+     * ------------------------------------------------- */
 
     private function initTable(array $line): void {
         $this->hasHead = true;
-        $this->tableId = 'tt' . bin2hex(random_bytes(4));
-        $colspan = count($line);
-        $filterId = "filter{$this->tableId}";
+        $this->numCols = count($line);
+        $this->tableId = 'tt-' . bin2hex(random_bytes(4));
+        $filterId = "filter-{$this->tableId}";
 
         $this->out[] = <<<HTML
-            <table id="{$this->tableId}" class="table is-bordered is-striped is-narrow is-hoverable">
-            <thead class="has-background-primary-95">
-                <!-- Headline placeholder -->
-                <tr>
-                    <th colspan="{$colspan}" style="text-align:center">
-                        <span class="button" onclick="filterTable.filterOnOff('{$filterId}')">
-                            <i id="n{$filterId}" class="fa-xs fa-solid fa-filter"></i>
-                        </span>
-                        {$this->title}
-                        <span style="margin-left:20px" class="button" onclick="filterTable.filterOnOff('{$filterId}',1);window.print()">
-                            <i class="fa-xs fa-solid fa-print"></i>
-                        </span>
-                      
-                    </th>
-                </tr>
-                <tr id="{$filterId}" style="display:none">
-        HTML;
+<table id="{$this->tableId}" class="fusion-table">
+<thead class="fusion-table-head">
+<tr class="fusion-table-title">
+    <th colspan="{$this->numCols}">
+        <button class="fusion-btn fusion-btn-icon fusion-filter-toggle"
+                onclick="filterTable.filterOnOff('{$filterId}')"
+                aria-label="Filter"></button>
 
-        // Filter row
-        $placeholder = 'placeholder="Stichwort filtern"';
+        <span class="fusion-table-title-text">{$this->title}</span>
+
+        <button class="fusion-btn fusion-btn-icon fusion-print"
+                onclick="filterTable.filterOnOff('{$filterId}',1);window.print()"
+                aria-label="Print"></button>
+    </th>
+</tr>
+
+<tr id="{$filterId}" class="fusion-filter-row" style="display:none">
+HTML;
+
         foreach ($line as $i => $cell) {
             $this->out[] = <<<HTML
-                <th>
-                    <input onchange="filterTable.searchRows('{$filterId}')" $placeholder id="idtitle{$i}{$this->tableId}" name="title{$i}{$this->tableId}" type="text">
-                </th>
-            HTML;
+<th>
+    <input class="fusion-filter-input"
+           type="text"
+           placeholder="filter…"
+           onchange="filterTable.searchRows('{$filterId}')">
+</th>
+HTML;
         }
 
-        $this->out[] = '</tr><tr>';
+        $this->out[] = '</tr><tr class="fusion-header-row">';
 
-        // Header row
         foreach ($line as $cell) {
             $this->out[] = $this->renderCell($cell, 'th');
         }
 
-        $this->out[] = '</tr></thead><tbody>';
-        $this->numCols = $colspan;
+        $this->out[] = '</tr></thead><tbody class="fusion-table-body">';
     }
 
-    private function renderCell($cell, string $tag): string {
-        // Handle nulls or empty strings
+    private function renderCell(mixed $cell, string $tag): string {
         if (!is_array($cell)) {
             return "<$tag>" . htmlspecialchars((string) $cell) . "</$tag>";
         }
 
-        // Support both associative and indexed arrays for attributes
         $attr = $cell['atrib'] ?? $cell[0] ?? '';
         $val = $cell['value'] ?? $cell[1] ?? '';
 
