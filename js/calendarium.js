@@ -1,11 +1,16 @@
 const gebi = (id) => document.getElementById(id);
 
 /**
- * hgsCalendar
- * ------------
- * Backend-driven popup calendar with lifecycle hooks.
- * Hooks allow integration with frameworks and UI events.
+ * hgsCalendar (fusion-lib)
+ * -----------------------
+ * Backend-driven popup calendar.
+ *
+ * JS CONTRACT:
+ * - Interact ONLY with `.fusion-*` classes and `data-*` attributes
+ * - Never depend on tag names or framework classes
+ * - Styling is handled exclusively by CSS
  */
+
 function hgsCalendar() {
     'use strict';
 
@@ -15,20 +20,24 @@ function hgsCalendar() {
     let gtarget = null;
     let tip = null;
     let outsideClickBound = false;
-    let autoAttachEnabled = false;
 
-    // Hook placeholders (all optional)
+    /* ---------------------------------
+     * Lifecycle hooks (all optional)
+     * --------------------------------- */
     const hooks = {
         beforeShow: null,
         afterShow: null,
         beforeSelect: null,
         afterSelect: null,
-        onClose: null,
+        onClose: null
     };
 
+    /* ---------------------------------
+     * Public API
+     * --------------------------------- */
     function fetchCalendar(m, y, target) {
-        if (backEnd === '') {
-            console.warn('hgsCalendar: backend path not set.');
+        if (!backEnd) {
+            console.warn('hgsCalendar: backend path not set');
             return;
         }
 
@@ -37,16 +46,15 @@ function hgsCalendar() {
         if (!m || !y) {
             const v = gebi(target)?.value;
             if (v) {
-                const parts = v.split('.');
-                if (parts.length >= 3) {
-                    [, m, y] = parts;
+                const p = v.split('.');
+                if (p.length >= 3) {
+                    [, m, y] = p;
                 }
             }
         }
 
-        const jsonPost = { y, m, target };
         callPHP ??= new myBackend();
-        callPHP.callDirect(backEnd, jsonPost, readResponse);
+        callPHP.callDirect(backEnd, {y, m, target}, renderCalendar);
     }
 
     function closeCalendar() {
@@ -54,49 +62,45 @@ function hgsCalendar() {
             calendar.style.display = 'none';
         }
 
-        if (tip && typeof tip.closeTip === 'function') {
-            tip.closeTip();
-        }
+        tip?.closeTip?.();
+        hooks.onClose?.(gtarget);
+    }
 
-        if (typeof hooks.onClose === 'function') {
-            hooks.onClose(gtarget);
+    function setBackEnd(path) {
+        backEnd = path;
+    }
+
+    function on(eventName, handler) {
+        if (eventName in hooks && typeof handler === 'function') {
+            hooks[eventName] = handler;
         }
     }
 
-    function readResponse(recPkg) {
-        if (typeof hooks.beforeShow === 'function') {
-            hooks.beforeShow(gtarget);
-        }
+    /* ---------------------------------
+     * Rendering & positioning
+     * --------------------------------- */
+    function renderCalendar(recPkg) {
+        hooks.beforeShow?.(gtarget);
 
         if (!calendar) {
             calendar = document.createElement('div');
             document.body.appendChild(calendar);
+            calendar.addEventListener('click', handleCalendarClick);
         }
 
-        Object.assign(calendar.style, {
-            position: 'absolute',
-            display: 'inline-block',
-            zIndex: highestZIndex(),
-        });
-
         calendar.innerHTML = recPkg.result;
+        calendar.style.position = 'absolute';
+        calendar.style.display = 'inline-block';
+        calendar.style.zIndex = highestZIndex();
 
-        const inputEl = gebi(gtarget);
-        const rect = inputEl.getBoundingClientRect();
+        const input = gebi(gtarget);
+        if (!input) {
+            return;
+        }
 
-        calendar.style.left = `${rect.x + window.scrollX}px`;
-        calendar.style.top = `${rect.y + rect.height + window.scrollY}px`;
-
-        calendar.onclick = tableCallback;
-
-        const navLinks = calendar.querySelectorAll('a[data-myv]');
-        navLinks.forEach((link) => {
-            link.onclick = (e) => {
-                e.preventDefault();
-                const [newM, newY, newTarget] = link.getAttribute('data-myv').split('|');
-                fetchCalendar(newM, newY, newTarget);
-            };
-        });
+        const r = input.getBoundingClientRect();
+        calendar.style.left = `${r.left + window.scrollX}px`;
+        calendar.style.top = `${r.bottom + window.scrollY}px`;
 
         if (typeof toolTip === 'function') {
             tip = new toolTip();
@@ -107,9 +111,46 @@ function hgsCalendar() {
             outsideClickBound = true;
         }
 
-        if (typeof hooks.afterShow === 'function') {
-            hooks.afterShow(gtarget, calendar);
+        hooks.afterShow?.(gtarget, calendar);
+    }
+
+    /* ---------------------------------
+     * Event handling (fusion-aligned)
+     * --------------------------------- */
+    function handleCalendarClick(e) {
+        const nav = e.target.closest(
+                '.fusion-calendar-prev, .fusion-calendar-next'
+                );
+        if (nav) {
+            const [m, y, target] = nav.dataset.myv.split('|');
+            fetchCalendar(m, y, target);
+            e.preventDefault();
+            return;
         }
+
+        const cell = e.target.closest('.fusion-calendar-day');
+        if (!cell) {
+            return;
+        }
+
+        const theDate = cell.dataset.thedate;
+        if (!theDate) {
+            return;
+        }
+
+        const input = gebi(gtarget);
+        if (!input) {
+            return;
+        }
+
+        if (hooks.beforeSelect?.(theDate, input) === false) {
+            return;
+        }
+
+        input.value = theDate;
+        closeCalendar();
+        input.onchange?.();
+        hooks.afterSelect?.(theDate, input);
     }
 
     function handleOutsideClick(e) {
@@ -117,103 +158,40 @@ function hgsCalendar() {
             return;
         }
 
-        const inputEl = gebi(gtarget);
-        if (calendar.contains(e.target) || e.target === inputEl) {
+        const input = gebi(gtarget);
+        if (calendar.contains(e.target) || e.target === input) {
             return;
         }
 
         closeCalendar();
     }
 
-    function tableCallback(e) {
-        const el = e.target;
-        if (el.id === 'close') {
-            closeCalendar();
-            return;
-        }
-
-        const theDate = el.getAttribute('data-thedate');
-        if (!theDate) {
-            return;
-        }
-
-        const targetEl = gebi(gtarget);
-        if (!targetEl) {
-            return;
-        }
-
-        if (typeof hooks.beforeSelect === 'function') {
-            const shouldContinue = hooks.beforeSelect(theDate, targetEl);
-            if (shouldContinue === false) {
-                return;
-            }
-        }
-
-        targetEl.value = theDate;
-        closeCalendar();
-
-        if (typeof targetEl.onchange === 'function') {
-            targetEl.onchange();
-        }
-
-        if (typeof hooks.afterSelect === 'function') {
-            hooks.afterSelect(theDate, targetEl);
-        }
-    }
-
+    /* ---------------------------------
+     * Utilities
+     * --------------------------------- */
     function highestZIndex() {
         let maxZ = 51;
-        document.querySelectorAll('*').forEach((el) => {
-            const z = parseInt(window.getComputedStyle(el).zIndex, 10);
+        document.querySelectorAll('body *').forEach((el) => {
+            const z = parseInt(getComputedStyle(el).zIndex, 10);
             if (!Number.isNaN(z)) {
                 maxZ = Math.max(maxZ, z);
             }
         });
-        return maxZ;
+        return maxZ + 1;
     }
 
-    function setBackEnd(path) {
-        backEnd = path;
-    }
-
-    function enableAutoAttach(flag = true) {
-        if (!flag || autoAttachEnabled) {
-            return;
-        }
-
-        autoAttachEnabled = true;
-
-        document.addEventListener('focusin', (e) => {
-            const el = e.target;
-            if (el.matches('input[data-calendar]')) {
-                const targetId = el.id || `cal_target_${Math.random().toString(36).slice(2)}`;
-                if (!el.id) {
-                    el.id = targetId;
-                }
-                fetchCalendar(null, null, targetId);
-            }
-        });
-    }
-
-    /**
-     * Public hook registration API
-     */
-    function on(eventName, handler) {
-        if (hooks.hasOwnProperty(eventName) && typeof handler === 'function') {
-            hooks[eventName] = handler;
-        } else {
-            console.warn(`Unknown or invalid hook: ${eventName}`);
-        }
-    }
-
-    // Public API
+    /* ---------------------------------
+     * Public surface
+     * --------------------------------- */
     return {
         fetchCalendar,
         closeCalendar,
         backEnd: setBackEnd,
-        autoAttach: enableAutoAttach,
-        on, // Hook registration
+        on
     };
 }
 
+/* ---------------------------------
+ * Global singleton
+ * --------------------------------- */
 window.HGS_CALENDAR = hgsCalendar();

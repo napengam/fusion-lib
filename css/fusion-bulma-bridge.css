@@ -1,0 +1,79 @@
+/* ===============================
+   Fusion → Bulma Calendar Bridge
+   =============================== */
+
+.fusion-calendar {
+    @supports not (display: grid) {}
+}
+
+.fusion-calendar {
+    border: 1px solid #dbdbdb;
+}
+
+.fusion-calendar th,
+.fusion-calendar td {
+    padding: 0.5rem;
+    border: 1px solid #dbdbdb;
+}
+
+.fusion-calendar-head {
+    background: #f5f5f5;
+}
+
+.fusion-calendar-title {
+    font-weight: 600;
+    text-align: center;
+}
+
+.fusion-calendar-prev,
+.fusion-calendar-next {
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.fusion-calendar-weekdays th {
+    background: #fafafa;
+    font-weight: 500;
+}
+
+.fusion-calendar-day:hover {
+    background: #f0f8ff;
+}
+
+.fusion-calendar-other {
+    color: #aaa;
+}
+
+.fusion-calendar-has-entry {
+    background: #effaf3;
+    color: #257942;
+    font-weight: 600;
+}
+/* Buttons */
+.fusion-btn {
+    display: inline-block;
+}
+
+.fusion-btn-primary {
+    background-color: var(--bulma-primary, #3273dc);
+    color: #fff;
+}
+
+/* Inputs */
+.fusion-input {
+    border-radius: 4px;
+    border: 1px solid #dbdbdb;
+    padding: 0.5em 0.75em;
+}
+
+/* Card */
+.fusion-card {
+    background: #fff;
+    border-radius: 6px;
+    padding: 1.25rem;
+}
+
+/* Layout helpers */
+.fusion-btn-block {
+    width: 100%;
+}

@@ -26,6 +26,9 @@
             let backend = myBackend();
             let dialog = justDialogs('de', 'bulma');
 
+
+
+
             function startPage() {
 
                 backend.fetchHTML('tableSpace', 'getTable.php', {}, (recPkg) => {
@@ -34,14 +37,12 @@
                     makeSticky('tt*', {col: 0, loff: 0, toff: 0});
                     sortTable('tt*');
                     toolTip();
-                    dialog.myInform('Here we are', true)
+                    dialog.myInform('Here we are', false);
 
 
                 });
             }
-
             startPage();
-
         </script>
 
 

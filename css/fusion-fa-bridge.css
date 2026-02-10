@@ -1,0 +1,26 @@
+/* ===============================
+   Fusion → Font Awesome Bridge
+   =============================== */
+
+.fusion-calendar-prev::before {
+    content: "\f053";
+    font-family: "Font Awesome 6 Free";
+    font-weight: 900;
+}
+
+.fusion-calendar-next::before {
+    content: "\f054";
+    font-family: "Font Awesome 6 Free";
+    font-weight: 900;
+}
+
+/* hide fallback characters */
+.fusion-calendar-prev,
+.fusion-calendar-next {
+    font-size: 0;
+}
+
+.fusion-calendar-prev::before,
+.fusion-calendar-next::before {
+    font-size: 0.9rem;
+}
