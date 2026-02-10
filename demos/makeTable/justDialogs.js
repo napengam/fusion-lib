@@ -272,7 +272,71 @@ function justDialogs(language = 'de') {
             setTimeout(() => d.dlg.close(), 3500);
     }
     }
+    function myUpload(text, actionUrl, responds, hiddenFields = {}) {
+        const d = dialogFactory.create('upload', {
+            title: lt.upload,
+            footer: `
+                                <form method="POST"
+                       enctype="multipart/form-data"
+                       target="jd_upload_iframe"
+                       class="fusion-form">
 
+                     <div class="fusion-field">
+                         <label class="fusion-file">
+                             <input class="fusion-file-input"
+                                    type="file"
+                                    name="uploadedfile[]"
+                                    multiple>
+                             <span class="fusion-file-label">Datei wählen…</span>
+                         </label>
+                     </div>
+
+                     <div class="fusion-actions fusion-actions-right">
+                         <button class="fusion-btn fusion-btn-primary" type="submit">
+                             ${lt.save}
+                         </button>
+                         <button class="fusion-btn" data-action="close">
+                             ${lt.cancel}
+                         </button>
+                     </div>
+                 </form>
+
+                 <iframe name="jd_upload_iframe" class="fusion-hidden"></iframe>
+`
+        });
+
+        d.body.innerHTML = text || '';
+        const form = d.dlg.querySelector('form');
+        const iframe = d.dlg.querySelector('iframe');
+        form.action = actionUrl;
+
+        // Clean and add hidden fields
+        Array.from(form.querySelectorAll('input[type=hidden]')).forEach((n) => {
+            n.remove();
+        });
+        Object.entries(hiddenFields).forEach(([name, value]) => {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = name;
+            input.value = value;
+            form.appendChild(input);
+        });
+
+        iframe.onload = () => {
+            try {
+                const doc = iframe.contentDocument || iframe.contentWindow.document;
+                const responseText = doc.body ? doc.body.textContent.trim() : "";
+                if (responseText) {
+                    responds?.(responseText);
+                    d.dlg.close();
+                }
+            } catch (err) {
+                console.error('Upload response access denied', err);
+            }
+        };
+
+        dialogFactory.show(d);
+    }
     /* ===============================
      * Public API
      * =============================== */
@@ -281,7 +345,8 @@ function justDialogs(language = 'de') {
         myConfirm,
         myPrompt,
         myLogin,
-        myInform
+        myInform,
+        myUpload
     };
 
     return justDialogs._instance;
