@@ -269,3 +269,76 @@
 .fusion-btn-block {
     width: 100%;
 }
+/* -------------------------
+   Form layout
+------------------------- */
+
+.fusion-form {
+    display: block;
+}
+
+.fusion-field {
+    margin-bottom: 1rem;
+}
+
+/* -------------------------
+   File input
+------------------------- */
+
+.fusion-file {
+    display: inline-block;
+    position: relative;
+    cursor: pointer;
+}
+
+.fusion-file-input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.fusion-file-label {
+    display: inline-block;
+    padding: 0.5rem 1rem;
+    border: 1px solid #ccc;
+    background: #f5f5f5;
+    border-radius: 4px;
+    user-select: none;
+}
+
+/* -------------------------
+   Buttons & actions
+------------------------- */
+
+.fusion-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 1rem;
+}
+
+.fusion-actions-right {
+    justify-content: flex-end;
+}
+
+.fusion-btn {
+    padding: 0.6rem 1rem;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+    background: #f5f5f5;
+    cursor: pointer;
+}
+
+.fusion-btn-primary {
+    background: #3273dc;
+    border-color: #3273dc;
+    color: #fff;
+}
+
+/* -------------------------
+   Utility
+------------------------- */
+
+.fusion-hidden {
+    display: none;
+}
