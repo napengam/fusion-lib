@@ -1,5 +1,5 @@
 function validator(value, foptions, lang = 'en') {
-    'use strict';
+   
 
     // =====================================================
     // Localized message dictionary
