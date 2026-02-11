@@ -13,12 +13,12 @@
 
         <div style="width:4000px;height:4000px"> </div><!-- will force scollbars neede her for demo   -->                   
 
-        <script src='myBackend.js'></script>
-        <script src='filterTable.js'></script>
-        <script src='sortTableNew.js'></script>
-        <script src='stickyCSS.js'></script>
-        <script src='tooltip.js'></script>
-        <script src='justDialogs.js'></script>
+        <script src='../../js/myBackend.js'></script>
+        <script src='../../js/filterTable.js'></script>
+        <script src='../../js/sortTableNew.js'></script>
+        <script src='../../js/stickyCSS.js'></script>
+        <script src='../../js/tooltip.js'></script>
+        <script src='../../js/justDialogs.js'></script>
 
 
         <script>

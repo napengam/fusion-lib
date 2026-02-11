@@ -1,6 +1,6 @@
 <?php
 
-require 'makeTable.php';
+require '../../php/makeTable.php';
 
 class GetTable {
 
