@@ -1,6 +1,5 @@
 function tableEdit(idx) {
     'use strict';
-
     // =======================================
     // Internal state
     // =======================================
@@ -8,7 +7,6 @@ function tableEdit(idx) {
     let theTable = '';
     let id = '';
     let jump, cm;
-
     let cellDictionary = null;
     let validatorCallBack = null;
     let changeCallBack = null;
@@ -16,7 +14,6 @@ function tableEdit(idx) {
     };
     let confirmCallBack = () => {
     };
-
     // =======================================
     // Table lookup
     // =======================================
