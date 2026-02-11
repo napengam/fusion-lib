@@ -1,5 +1,5 @@
 function justDialogs(language = 'de') {
-   
+
     if (justDialogs._instance) {
         return justDialogs._instance;
     }
@@ -45,83 +45,63 @@ function justDialogs(language = 'de') {
     const lt = LTEXT[language] || LTEXT.de;
 
     /* ===============================
-     * Style injection
+     * Internal helpers
      * =============================== */
-    (function injectStyle() {
-        if (document.getElementById('justDialogStyle')) {
-            return;
-        }
-
-        const s = document.createElement('style');
-        s.id = 'justDialogStyle';
-        s.textContent = `
-            .outerDialog {
-                overflow: auto;
-                resize: both;
-                min-height: 10px;
-                position: fixed;
-                margin: 0;
-                border: 0;
-                max-width: 600px;
-                min-width: 280px;
-                box-shadow: 1px 2px 15px rgba(0,0,0,0.3);
-                padding: 0;
-                border-radius: 6px;
-            }
-            .outerDialog::backdrop {
-                background: rgba(0, 0, 0, 0.4);
-            }
-            .diagDrag { cursor: grab; }
-            .diagDrag:active { cursor: grabbing; }
-            #fadeBox {
-                position: fixed;
-                top: 20px;
-                right: 20px;
-                transition: opacity 1.5s ease-out;
-                z-index: 9999;
-            }
-            .fade-out { opacity: 0; }
-            .dialog-footer {
-                padding: 1rem;
-                border-top: 1px solid #dbdbdb;
-                background-color: #f9f9f9;
-            }
-        `;
-        document.head.appendChild(s);
-    })();
-
-    /* ===============================
-     * Internal Helpers
-     * =============================== */
-    function positionDialogShow(wrapper) {
-        const dlg = wrapper.querySelector('dialog');
-        if (dlg) {
-            dlg.style.left = `${(window.innerWidth - dlg.offsetWidth) / 2}px`;
-            dlg.style.top = `${(window.innerHeight - dlg.offsetHeight) / 2}px`;
-        }
+    function centerDialog(dlg) {
+        dlg.style.left = `${(window.innerWidth - dlg.offsetWidth) / 2}px`;
+        dlg.style.top = `${(window.innerHeight - dlg.offsetHeight) / 2}px`;
     }
 
     function makeDraggable(dialog, handle) {
-        let offsetX, offsetY;
+        let startX = 0;
+        let startY = 0;
+        let startLeft = 0;
+        let startTop = 0;
+
+        handle.style.cursor = 'grab';
+
         handle.addEventListener('pointerdown', (e) => {
-            offsetX = e.clientX - dialog.offsetLeft;
-            offsetY = e.clientY - dialog.offsetTop;
+            e.preventDefault();
 
-            const move = (e) => {
-                dialog.style.left = `${e.clientX - offsetX}px`;
-                dialog.style.top = `${e.clientY - offsetY}px`;
-            };
+            const rect = dialog.getBoundingClientRect();
 
-            const up = () => {
-                document.removeEventListener('pointermove', move);
-                document.removeEventListener('pointerup', up);
-            };
+            // Force fixed positioning so browser stops auto-centering
+            dialog.style.position = 'fixed';
+            dialog.style.margin = '0';
 
-            document.addEventListener('pointermove', move);
-            document.addEventListener('pointerup', up);
+            startX = e.clientX;
+            startY = e.clientY;
+            startLeft = rect.left;
+            startTop = rect.top;
+
+            handle.style.cursor = 'grabbing';
+            handle.setPointerCapture(e.pointerId);
+
+            document.addEventListener('pointermove', onMove);
+            document.addEventListener('pointerup', onUp);
         });
+
+        function onMove(e) {
+            const dx = e.clientX - startX;
+            const dy = e.clientY - startY;
+
+            dialog.style.left = `${startLeft + dx}px`;
+            dialog.style.top = `${startTop + dy}px`;
+        }
+
+        function onUp(e) {
+            handle.releasePointerCapture(e.pointerId);
+            handle.style.cursor = 'grab';
+
+            document.removeEventListener('pointermove', onMove);
+            document.removeEventListener('pointerup', onUp);
+        }
     }
 
+
+    /* ===============================
+     * Dialog factory
+     * =============================== */
     const dialogFactory = (function () {
         const cache = new Map();
 
@@ -131,21 +111,25 @@ function justDialogs(language = 'de') {
             }
 
             const wrap = document.createElement('div');
+            wrap.className = 'fusion-dialog-wrap';
+
             wrap.innerHTML = `
-                <dialog class="outerDialog">
-                    <div class="message is-dark" style="margin-bottom:0">
-                        <div class="message-header diagDrag">
-                            <span>${cfg.title}</span>
-                            <button class="delete" data-action="close"></button>
-                        </div>
-                        <div class="message-body"></div>
+                <dialog class="fusion-dialog">
+                    <div class="fusion-dialog-header fusion-dialog-drag">
+                        <span class="fusion-dialog-title">${cfg.title}</span>
+                        <button class="fusion-dialog-close" data-action="close">×</button>
                     </div>
-                    <div class="dialog-footer">${cfg.footer || ''}</div>
-                </dialog>`;
+                    <div class="fusion-dialog-body"></div>
+                    <div class="fusion-dialog-footer">
+                        ${cfg.footer || ''}
+                    </div>
+                </dialog>
+            `;
 
             document.body.appendChild(wrap);
+
             const dlg = wrap.querySelector('dialog');
-            const body = dlg.querySelector('.message-body');
+            const body = wrap.querySelector('.fusion-dialog-body');
 
             dlg.addEventListener('click', (e) => {
                 const btn = e.target.closest('[data-action]');
@@ -156,36 +140,39 @@ function justDialogs(language = 'de') {
                 if (action === 'close') {
                     dlg.close();
                 } else {
-                    dlg.dispatchEvent(new CustomEvent('dialog-action', { detail: action }));
+                    dlg.dispatchEvent(
+                            new CustomEvent('dialog-action', {detail: action})
+                            );
                 }
             });
 
-            makeDraggable(dlg, dlg.querySelector('.diagDrag'));
-            const inst = { wrap, dlg, body };
+            makeDraggable(dlg, dlg.querySelector('.fusion-dialog-drag'));
+
+            const inst = {wrap, dlg, body};
             cache.set(type, inst);
             return inst;
         }
 
-        function show(inst, { modal = true } = {}) {
+        function show(inst, modal = true) {
             if (modal) {
                 inst.dlg.showModal();
             } else {
                 inst.dlg.show();
             }
-            positionDialogShow(inst.wrap);
+            centerDialog(inst.dlg);
         }
 
-        return { create, show };
+        return {create, show};
     })();
 
     /* ===============================
-     * Implementations
+     * Public dialog APIs
      * =============================== */
 
     function myAlert(text) {
         const d = dialogFactory.create('alert', {
             title: lt.alert,
-            footer: `<button class="button is-link is-fullwidth" data-action="close">${lt.ok}</button>`
+            footer: `<button class="fusion-btn fusion-btn-primary" data-action="close">${lt.ok}</button>`
         });
         d.body.innerHTML = text;
         dialogFactory.show(d);
@@ -195,19 +182,23 @@ function justDialogs(language = 'de') {
         const d = dialogFactory.create('confirm', {
             title: lt.confirm,
             footer: `
-                <div class="buttons is-centered">
-                    <button class="button is-primary" data-action="yes">${lt.yes}</button>
-                    <button class="button" data-action="no">${lt.no}</button>
-                </div>`
+                <button class="fusion-btn fusion-btn-primary" data-action="yes">${lt.yes}</button>
+                <button class="fusion-btn" data-action="no">${lt.no}</button>
+            `
         });
+
         d.body.innerHTML = text;
 
-        const h = (e) => {
-            if (e.detail === 'yes') { yes?.(); }
-            if (e.detail === 'no') { no?.(); }
+        d.dlg.addEventListener('dialog-action', (e) => {
+            if (e.detail === 'yes') {
+                yes?.();
+            }
+            if (e.detail === 'no') {
+                no?.();
+            }
             d.dlg.close();
-        };
-        d.dlg.addEventListener('dialog-action', h, { once: true });
+        }, {once: true});
+
         dialogFactory.show(d);
     }
 
@@ -215,26 +206,26 @@ function justDialogs(language = 'de') {
         const d = dialogFactory.create('prompt', {
             title: lt.prompt,
             footer: `
-                <div class="field">
-                    <label class="label">${lt.value}</label>
-                    <div class="control"><input class="input" name="v"></div>
-                </div>
-                <div class="buttons is-right">
-                    <button class="button is-primary" data-action="save">${lt.save}</button>
-                    <button class="button" data-action="close">${lt.cancel}</button>
-                </div>`
+                <button class="fusion-btn fusion-btn-primary" data-action="save">${lt.save}</button>
+                <button class="fusion-btn" data-action="close">${lt.cancel}</button>
+            `
         });
-        d.body.innerHTML = text;
+
+        d.body.innerHTML = `
+            <label class="fusion-label">${lt.value}</label>
+            <input class="fusion-input" name="v">
+        `;
+
         const input = d.dlg.querySelector('[name=v]');
         input.value = defaultValue;
 
-        const h = (e) => {
+        d.dlg.addEventListener('dialog-action', (e) => {
             if (e.detail === 'save') {
                 save(input.value);
                 d.dlg.close();
             }
-        };
-        d.dlg.addEventListener('dialog-action', h, { once: true });
+        }, {once: true});
+
         dialogFactory.show(d);
     }
 
@@ -242,58 +233,76 @@ function justDialogs(language = 'de') {
         const d = dialogFactory.create('login', {
             title: lt.login,
             footer: `
-                <div class="field">
-                    <label class="label">${lt.name}</label>
-                    <div class="control">
-                        <input class="input" name="u" autocomplete="username">
-                    </div>
-                </div>
-                <div class="field">
-                    <label class="label">${lt.passwd}</label>
-                    <div class="control">
-                        <input class="input" type="password" name="p" autocomplete="current-password">
-                    </div>
-                </div>
-                <div class="buttons is-block">
-                    <button class="button is-primary is-fullwidth" data-action="login">${lt.login}</button>
-                    <button class="button is-light is-fullwidth mt-2" data-action="close">${lt.cancel}</button>
-                </div>`
+                <button class="fusion-btn fusion-btn-primary" data-action="login">${lt.login}</button>
+                <button class="fusion-btn" data-action="close">${lt.cancel}</button>
+            `
         });
-        d.body.innerHTML = text;
 
-        const h = (e) => {
+        d.body.innerHTML = `
+            <label class="fusion-label">${lt.name}</label>
+            <input class="fusion-input" name="u" autocomplete="username">
+            <label class="fusion-label">${lt.passwd}</label>
+            <input class="fusion-input" type="password" name="p" autocomplete="current-password">
+        `;
+
+        d.dlg.addEventListener('dialog-action', (e) => {
             if (e.detail === 'login') {
-                const u = d.dlg.querySelector('[name=u]').value;
-                const p = d.dlg.querySelector('[name=p]').value;
-                save(u, p);
+                save(
+                        d.dlg.querySelector('[name=u]').value,
+                        d.dlg.querySelector('[name=p]').value
+                        );
                 d.dlg.close();
             }
-        };
-        d.dlg.addEventListener('dialog-action', h, { once: true });
+        }, {once: true});
+
         dialogFactory.show(d);
     }
 
+    function myInform(text, fade = false) {
+        const d = dialogFactory.create('inform', {
+            title: lt.info,
+            footer: `<button class="fusion-btn" data-action="close">${lt.ok}</button>`
+        });
+
+        d.body.innerHTML = text;
+        dialogFactory.show(d, false);
+
+        if (fade) {
+            d.wrap.classList.add('fusion-fade');
+            setTimeout(() => d.dlg.close(), 3500);
+    }
+    }
     function myUpload(text, actionUrl, responds, hiddenFields = {}) {
         const d = dialogFactory.create('upload', {
             title: lt.upload,
             footer: `
-                <form method="POST" enctype="multipart/form-data" target="jd_upload_iframe">
-                    <div class="field">
-                        <div class="file has-name is-fullwidth">
-                            <label class="file-label">
-                                <input class="file-input" type="file" name="uploadedfile[]" multiple>
-                                <span class="file-cta">
-                                    <span class="file-label">Datei wählen…</span>
-                                </span>
-                            </label>
-                        </div>
-                    </div>
-                    <div class="buttons is-right mt-4">
-                        <button class="button is-primary" type="submit">${lt.save}</button>
-                        <button class="button" data-action="close">${lt.cancel}</button>
-                    </div>
-                </form>
-                <iframe name="jd_upload_iframe" style="display:none"></iframe>`
+                                <form method="POST"
+                       enctype="multipart/form-data"
+                       target="jd_upload_iframe"
+                       class="fusion-form">
+
+                     <div class="fusion-field">
+                         <label class="fusion-file">
+                             <input class="fusion-file-input"
+                                    type="file"
+                                    name="uploadedfile[]"
+                                    multiple>
+                             <span class="fusion-file-label">Datei wählen…</span>
+                         </label>
+                     </div>
+
+                     <div class="fusion-actions fusion-actions-right">
+                         <button class="fusion-btn fusion-btn-primary" type="submit">
+                             ${lt.save}
+                         </button>
+                         <button class="fusion-btn" data-action="close">
+                             ${lt.cancel}
+                         </button>
+                     </div>
+                 </form>
+
+                 <iframe name="jd_upload_iframe" class="fusion-hidden"></iframe>
+`
         });
 
         d.body.innerHTML = text || '';
@@ -302,7 +311,9 @@ function justDialogs(language = 'de') {
         form.action = actionUrl;
 
         // Clean and add hidden fields
-        Array.from(form.querySelectorAll('input[type=hidden]')).forEach((n) => { n.remove(); });
+        Array.from(form.querySelectorAll('input[type=hidden]')).forEach((n) => {
+            n.remove();
+        });
         Object.entries(hiddenFields).forEach(([name, value]) => {
             const input = document.createElement('input');
             input.type = 'hidden';
@@ -326,29 +337,9 @@ function justDialogs(language = 'de') {
 
         dialogFactory.show(d);
     }
-
-    function myInform(text, fade = false) {
-        const d = dialogFactory.create('inform', {
-            title: lt.info,
-            footer: `<button class="button is-small is-fullwidth" data-action="close">${lt.ok}</button>`
-        });
-        d.body.innerHTML = text;
-        dialogFactory.show(d, { modal: false });
-
-        if (fade) {
-            d.wrap.id = 'fadeBox';
-            d.wrap.classList.remove('fade-out');
-            setTimeout(() => {
-                d.wrap.classList.add('fade-out');
-                setTimeout(() => {
-                    d.dlg.close();
-                    d.wrap.classList.remove('fade-out');
-                }, 1500);
-            }, 2000);
-        }
-    }
-
-    // Public API Assignment
+    /* ===============================
+     * Public API
+     * =============================== */
     justDialogs._instance = {
         myAlert,
         myConfirm,
