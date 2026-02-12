@@ -67,15 +67,12 @@ function justDialogs(language = 'de') {
 
         handle.addEventListener('pointerdown', (e) => {
 
-            if (e.target.closest('.fusion-dialog-close')) {
-                e.target.closest('.fusion-dialog').close();
+            if (e.target.closest('.fusion-dialog-close')) {         
                 return;
             }
 
             e.preventDefault();
-
             const rect = dialog.getBoundingClientRect();
-
 
             dialog.style.position = 'fixed';
             dialog.style.margin = '0';
@@ -163,13 +160,6 @@ function justDialogs(language = 'de') {
                             );
                 }
             });
-
-            dlg.querySelector('.fusion-dialog-close').addEventListener('click', (e) => {
-
-                e.target.closest('.fusion-dialog').close();
-
-            });
-
 
             dlg.draggable = true;
             makeDraggable(dlg, dlg.querySelector('.fusion-dialog-drag'));
