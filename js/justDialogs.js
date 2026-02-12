@@ -66,6 +66,12 @@ function justDialogs(language = 'de') {
         handle.style.cursor = 'grab';
 
         handle.addEventListener('pointerdown', (e) => {
+
+            if (e.target.closest('.fusion-dialog-close')) {
+                e.target.closest('.fusion-dialog').close();
+                return;
+            }
+
             e.preventDefault();
 
             const rect = dialog.getBoundingClientRect();
@@ -157,6 +163,14 @@ function justDialogs(language = 'de') {
                             );
                 }
             });
+
+            dlg.querySelector('.fusion-dialog-close').addEventListener('click', (e) => {
+
+                e.target.closest('.fusion-dialog').close();
+
+            });
+
+
             dlg.draggable = true;
             makeDraggable(dlg, dlg.querySelector('.fusion-dialog-drag'));
 
@@ -353,6 +367,15 @@ function justDialogs(language = 'de') {
 
         dialogFactory.show(d);
     }
+
+    function myClose() {
+        let d = document.querySelector('Dialog');
+        if (d) {
+            d.close();
+        }
+    }
+
+
     /* ===============================
      * Public API
      * =============================== */
@@ -362,7 +385,8 @@ function justDialogs(language = 'de') {
         myPrompt,
         myLogin,
         myInform,
-        myUpload
+        myUpload,
+        myClose
     };
 
     return justDialogs._instance;
