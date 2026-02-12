@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>ContextMenu Demo</title>  
+        <link 
+            rel="stylesheet" 
+            href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+            >
+
+        <link rel="stylesheet" href="/fusion-lib/css/fusion-plain.css">
+    </head>
+    <div class="container">
+        <div class='section' >
+            <div id = 'todo'>
+                <h1 class="title">right click here</h1></div>
+        </div>
+        <div class='section' >
+            <div id = 'todoother'><h3 class="title">other context menu here </h3></div>
+        </div>
+        <ul id = 'todomenue'>
+            <li data-id = 'soup' ><i class = "fas fa-sort-alpha-up" aria-hidden = "true"></i> sort ascending
+            <li data-id = 'sodown' ><i class = "fas fa-sort-alpha-down" aria-hidden = "true"></i> sort descending
+            <li><hr>
+            <li data-id = 'insert' ><i class = " fas fa-sign-in-alt fa-flip-horizontal" aria-hidden = "true"></i> new row
+            <li data-id = 'delete' ><i class = " fas fa-trash" aria-hidden = "true"></i> delet row ...
+        </ul>
+    </div>
+
+    <script src = '../../js/contextMenu.js'></script>
+    <script>
+        //********************************************
+        //  context menu is given by HTML
+        //********************************************
+
+        cm0 = new contextMenuF('todomenue');
+        document.getElementById('todoother').oncontextmenu = cm0.open;
+        //********************************************
+        //  context menu is created in js
+        //********************************************
+        cm = new contextMenuF('');
+        document.getElementById('todo').oncontextmenu = cm.open;
+        ctm = [
+            {id: "sortup", icon: '<i class=" fa fa-sort-alpha-up" aria-hidden="true"></i>', label: ' sort up', handler: ''},
+            {id: "sortdown", icon: '<i class=" fa fa-sort-alpha-down" aria-hidden="true"></i>', label: ' sort down', handler: ''},
+            {id: '__sep__'},
+            {id: "comment", icon: '<i class=" far fa-comment" aria-hidden="true"></i>', label: ' Comment...', handler: ''},
+            {id: '__sep__'},
+            {id: "insert", icon: '<i class=" fa fa-sign-in-alt fa-flip-horizontal" aria-hidden="true"></i>', label: ' insert row', handler: ''},
+            {id: "copy", icon: '<i class=" fa fa-reply fa-flip-vertical " aria-hidden="true"></i>', label: ' copy row', handler: ''},
+            {id: "delete", icon: '<i class=" fa fa-trash-alt" aria-hidden="true"></i>', label: ' delete row...', handler: ''},
+            {id: '__sep__'},
+            {id: "uplimage", icon: '<i class=" fa fa-image"  aria-hidden="true"></i>', label: ' upload image', handler: ''},
+            {id: "upload", icon: '<i class=" fa fa-paperclip"  aria-hidden="true"></i>', label: ' upload file', handler: ''}
+        ];
+        cm.addMenu(ctm);
+
+    </script>
+</body>
+</html>

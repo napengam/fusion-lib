@@ -48,8 +48,13 @@ function justDialogs(language = 'de') {
      * Internal helpers
      * =============================== */
     function centerDialog(dlg) {
-        dlg.style.left = `${(window.innerWidth - dlg.offsetWidth) / 2}px`;
-        dlg.style.top = `${(window.innerHeight - dlg.offsetHeight) / 2}px`;
+        // Ensure proper positioning
+        dlg.style.position = 'fixed';
+
+        const rect = dlg.getBoundingClientRect();
+
+        dlg.style.left = `${(window.innerWidth - rect.width) / 2}px`;
+        dlg.style.top = `${(window.innerHeight - rect.height) / 2}px`;
     }
 
     function makeDraggable(dialog, handle) {
@@ -65,9 +70,11 @@ function justDialogs(language = 'de') {
 
             const rect = dialog.getBoundingClientRect();
 
-            // Force fixed positioning so browser stops auto-centering
+
             dialog.style.position = 'fixed';
             dialog.style.margin = '0';
+            dialog.style.left = rect.left + 'px';
+            dialog.style.top = rect.top + 'px';
 
             startX = e.clientX;
             startY = e.clientY;
@@ -85,8 +92,8 @@ function justDialogs(language = 'de') {
             const dx = e.clientX - startX;
             const dy = e.clientY - startY;
 
-            dialog.style.left = `${startLeft + dx}px`;
-            dialog.style.top = `${startTop + dy}px`;
+            dialog.style.left = startLeft + dx + 'px';
+            dialog.style.top = startTop + dy + 'px';
         }
 
         function onUp(e) {
@@ -98,6 +105,11 @@ function justDialogs(language = 'de') {
         }
     }
 
+    function closeThisDialog(t) {
+
+        t.closest('DIALOG').close()
+
+    }
 
     /* ===============================
      * Dialog factory
@@ -116,9 +128,9 @@ function justDialogs(language = 'de') {
             wrap.innerHTML = `
                 <dialog class="fusion-dialog">
                     <div class="fusion-dialog-header fusion-dialog-drag">
-                        <span class="fusion-dialog-title">${cfg.title}</span>
-                        <button class="fusion-dialog-close" data-action="close">×</button>
-                    </div>
+                        <span class="fusion-dialog-title">${cfg.title}</span> 
+                        <button class="fusion-dialog-close" data-action='close'>X</button>
+                   </div>
                     <div class="fusion-dialog-body"></div>
                     <div class="fusion-dialog-footer">
                         ${cfg.footer || ''}
@@ -145,7 +157,7 @@ function justDialogs(language = 'de') {
                             );
                 }
             });
-
+            dlg.draggable = true;
             makeDraggable(dlg, dlg.querySelector('.fusion-dialog-drag'));
 
             const inst = {wrap, dlg, body};
@@ -158,8 +170,9 @@ function justDialogs(language = 'de') {
                 inst.dlg.showModal();
             } else {
                 inst.dlg.show();
-            }
-            centerDialog(inst.dlg);
+                centerDialog(inst.dlg);
+        }
+
         }
 
         return {create, show};
@@ -169,7 +182,7 @@ function justDialogs(language = 'de') {
      * Public dialog APIs
      * =============================== */
 
-    function myAlert(text,hook=false) {
+    function myAlert(text, hook = false) {
         const d = dialogFactory.create('alert', {
             title: lt.alert,
             footer: `<button class="fusion-btn fusion-btn-primary" data-action="close">${lt.ok}</button>`
@@ -178,7 +191,7 @@ function justDialogs(language = 'de') {
         dialogFactory.show(d);
         if (typeof hook === 'function') {
             beforeCloseHook = hook;
-        }
+    }
     }
 
     function myConfirm(text, yes, no) {

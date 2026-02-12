@@ -163,6 +163,9 @@
     min-width: 280px;
     max-width: 600px;
     box-shadow: 1px 2px 15px rgba(0,0,0,.3);
+/*    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);*/
 }
 
 .fusion-dialog::backdrop {
@@ -209,9 +212,7 @@
     color: white;
     border-color: #3273dc;
 }
-.fusion-dialog {
-    position: fixed; /* required for dragging */
-}
+
 /* =========================
    Fusion Dialog (plain)
    ========================= */
