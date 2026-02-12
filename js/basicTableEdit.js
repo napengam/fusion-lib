@@ -24,41 +24,42 @@ function tableEdit(idx) {
         theTable = idx;
         id = theTable.id;
     }
-    if (!theTable || !id)
+
+    if (!theTable || !id) {
         return;
+    }
 
-    // =======================================
-    // Context Menu setup
-    // =======================================
-    cm = new contextMenuF('', id);
-    cm.addMenu([
-        {id: 'insert', icon: '<i class="fa fa-sign-in-alt fa-flip-horizontal"></i>', label: ' insert row', handler: contextAddRow},
-        {id: 'copy', icon: '<i class="fa fa-reply fa-flip-vertical"></i>', label: ' copy row', handler: contextCopyRow},
-        {id: 'delete', icon: '<i class="fa fa-trash-alt"></i>', label: ' delete row...', handler: contextDeleteRow}
-    ]);
+// =======================================
+// Context-menu setup (optional)
+// =======================================
+    if (typeof contextMenuF === 'function') {
+        cm = new contextMenuF('', id);
+        cm.addMenu([
+            {id: 'insert', icon: '➕', label: ' insert row', handler: contextAddRow},
+            {id: 'copy', icon: '⧉', label: ' copy row', handler: contextCopyRow},
+            {id: 'delete', icon: '🗑️', label: ' delete row…', handler: contextDeleteRow}
+        ]);
+    }
 
-    // =======================================
-    // Delegated Event Binding
-    // =======================================
+// =======================================
+// Delegated Event Binding
+// =======================================
     theTable.addEventListener('contextmenu', handleContextMenu);
     theTable.addEventListener('click', cellEdit);
-
-    // 🚀 Delegated keydown handling (applies to all inputs/selects)
     theTable.addEventListener('keydown', (e) => {
         if (e.target.matches('.theField')) {
             jump.updown(e);
         }
     });
-
     theTable.dataset.ininput = '';
     jump = jumper(theTable);
-
     // =======================================
     // Core Handlers
     // =======================================
     function handleContextMenu(e) {
-        if (!e.target.closest('td'))
+        if (!e.target.closest('td')) {
             return;
+        }
 
         if (theTable.dataset.ininput) {
             [ri, ci] = rici();
@@ -67,7 +68,10 @@ function tableEdit(idx) {
             theTable.dataset.ininput = '';
             cell.removeAttribute('data-editcursor');
         }
-        cm.open(e);
+
+        if (cm) {
+            cm.open(e);
+        }
     }
 
     function cancelEdit() {
@@ -82,10 +86,10 @@ function tableEdit(idx) {
 
     function cellEdit(e) {
         const td = getTD(e.target);
-        if (td === '')
+        if (!td) {
             return;
+        }
         nexttd = td;
-
         if (jump.escapeEdit()) {
             [ri, ci] = rici();
             const cell = theTable.rows[ri].cells[ci];
@@ -95,8 +99,9 @@ function tableEdit(idx) {
             return;
         }
 
-        if (td.querySelector('.theField'))
+        if (td.querySelector('.theField')) {
             return; // already editing
+        }
 
         if (theTable.dataset.ininput === '') {
             if (!theTable.querySelector('.theField')) {
@@ -113,13 +118,11 @@ function tableEdit(idx) {
         [ri, ci] = rici();
         const cell = theTable.rows[ri].cells[ci];
         cell.style.backgroundColor = '';
-
         const field = theTable.querySelector('.theField');
         const value = field ? field.value : '';
-
         if (cell.dataset.oldvalue === value) {
             cell.removeAttribute('data-editcursor');
-            cell.innerHTML = cell.dataset.oldvalue;
+            cell.innerHTML = htmlentity(cell.dataset.oldvalue);
             nextCell(td);
             return;
         }
@@ -127,12 +130,13 @@ function tableEdit(idx) {
         if (cellDictionary && validatorCallBack) {
             const vcb = validatorCallBack(value, cellDictionary[ci]);
             if (!vcb.ok) {
-                errorCallBack(vcb.msg, () => {
-                    cell.removeAttribute('data-editcursor');
-                    cell.innerHTML = cell.dataset.oldvalue;
-                    cell.style.backgroundColor = 'silver';
-                    jump.clickHere(ri, ci);
-                });
+
+                cell.removeAttribute('data-editcursor');
+                cell.innerHTML = htmlentity(cell.dataset.oldvalue);
+                cell.style.backgroundColor = 'silver';
+                jump.clickHere(ri, ci);
+
+                errorCallBack(vcb.msg);
                 return;
             }
         }
@@ -148,13 +152,14 @@ function tableEdit(idx) {
 
     function responds(resPkg) {
         const cell = theTable.querySelector('[data-editcursor]');
-        if (!cell)
+        if (!cell) {
             return;
+        }
 
         cell.removeAttribute('data-editcursor');
-        if (resPkg.error !== '') {
+        if (resPkg.error) {
             errorCallBack(resPkg.error);
-            cell.innerHTML = cell.dataset.oldvalue;
+            cell.innerHTML = htmlentity(cell.dataset.oldvalue);
             cell.style.backgroundColor = 'silver';
             jump.clickHere(ri, ci);
         } else {
@@ -164,8 +169,9 @@ function tableEdit(idx) {
 
         cell.removeAttribute('data-oldvalue');
         const f = theTable.querySelector('.theField');
-        if (f)
+        if (f) {
             f.focus();
+        }
     }
 
     // =======================================
@@ -178,52 +184,67 @@ function tableEdit(idx) {
             return;
         }
         jump.fakeClick();
-
         const wcs = window.getComputedStyle(td);
         const mnw = ['paddingLeft', 'paddingRight', 'borderLeftWidth', 'borderRightWidth']
-                .map(k => parseFloat(wcs[k])).reduce((a, b) => a + b, 0);
+                .map(k => parseFloat(wcs[k]) || 0).reduce((a, b) => a + b, 0);
         const mnh = ['paddingTop', 'paddingBottom', 'borderTopWidth', 'borderBottomWidth']
-                .map(k => parseFloat(wcs[k])).reduce((a, b) => a + b, 0);
-
-        const s = `outline:none;border:0;padding:0;
-               width:${td.clientWidth - mnw - 2}px;
-               height:${td.clientHeight - mnh}px;`;
-
+                .map(k => parseFloat(wcs[k]) || 0).reduce((a, b) => a + b, 0);
+        const s = `
+            outline:none;border:0;padding:0;
+            max-width:${td.clientWidth - mnw - 2}px;
+            height:${td.clientHeight - mnh}px;
+        `;
         const readonly = opt?.edit === 'no' ? 'readonly' : '';
         td.dataset.oldvalue = td.innerHTML.trim();
-
         if (opt?.type === 'select' && Array.isArray(opt.options)) {
             const optionsHtml = opt.options.map(o => {
                 let value, text;
-                if (typeof o === 'string' && o.includes('|'))
+                if (typeof o === 'string' && o.includes('|')) {
                     [value, text] = o.split('|');
-                else
-                    value = o, text = o;
+                } else {
+                    value = o;
+                    text = o;
+                }
                 const selected = (value === td.dataset.oldvalue) ? 'selected' : '';
-                return `<option value="${value}" ${selected}>${text}</option>`;
+                return `<option value="${htmlentity(value)}" ${selected}>${htmlentity(text)}</option>`;
             }).join('');
             td.innerHTML = `<select class="theField" style="${s}">${optionsHtml}</select>`;
         } else {
-            td.innerHTML = `<input ${readonly} class="theField input is-family-monospace"
-                      style="${s}" type="text" value="${td.dataset.oldvalue}">`;
+            td.innerHTML = `<input ${readonly}  class="theField"
+                style="${s}" type="text" value="${htmlentity(td.dataset.oldvalue)}">`;
+            if (opt?.type === 'date') {
+                td.firstChild.onclick = getCalendar;
+            }
         }
+        td.firstChild.oncontextmenu = () => {
+            window.event.stopPropagation();
+        };
 
         td.dataset.editcursor = '';
         theTable.dataset.ininput = '1';
         td.querySelector('.theField').focus();
     }
-
+    function getCalendar(e) {
+        var y = '', m = '', v;
+        e.stopPropagation();
+        v = this.value.split('.');
+        if (v.length === 3) {
+            y = v[2];
+            m = v[1];
+        }
+        this.id = 'hier';
+        window.calendar.fetchCalendar(m, y, this.id);
+    }
     // =======================================
-    // Context Menu Handlers
+    // Context-menu Handlers
     // =======================================
     function contextAddRow(e) {
         const here = walkUp(e.target);
+        if (!here) {
+            return null;
+        }
         const newRow = here.table.insertRow(here.row.rowIndex);
         [...here.row.cells].forEach(() => newRow.insertCell());
-        newRow.cells[0].innerHTML = 'W';
-        const height = newRow.cells[0].clientHeight;
-        newRow.cells[0].innerHTML = '';
-        newRow.cells[0].style.height = height + 'px';
         jump.refresh();
         return newRow.rowIndex;
     }
@@ -231,20 +252,24 @@ function tableEdit(idx) {
     function contextDeleteRow(e) {
         confirmCallBack('Delete row?', () => {
             const here = walkUp(e.target);
-            here.table.deleteRow(here.row.rowIndex);
-            jump.refresh();
+            if (here) {
+                here.table.deleteRow(here.row.rowIndex);
+                jump.refresh();
+            }
         }, () => {
         });
     }
 
     function contextCopyRow(e) {
         const here = walkUp(e.target);
+        if (!here) {
+            return null;
+        }
         const newRow = here.table.insertRow(here.row.rowIndex);
         [...here.row.cells].forEach((cell, i) => {
             newRow.insertCell();
-            newRow.cells[i].innerHTML = cell.innerHTML;
+            newRow.cells[i].innerHTML = htmlentity(cell.textContent || '');
         });
-        newRow.cells[0].style.height = '18px';
         jump.refresh();
         return newRow.rowIndex;
     }
@@ -261,7 +286,7 @@ function tableEdit(idx) {
             }
             obj = obj.parentNode;
         }
-        return '';
+        return null;
     }
 
     function rici() {
@@ -270,9 +295,11 @@ function tableEdit(idx) {
     }
 
     function htmlentity(value) {
-        if (typeof value !== 'string')
+        if (typeof value !== 'string') {
             return value;
-        return value.replace(/&/g, '&amp;')
+        }
+        return value
+                .replace(/&/g, '&amp;')
                 .replace(/</g, '&lt;')
                 .replace(/>/g, '&gt;')
                 .replace(/"/g, '&quot;')
@@ -281,6 +308,9 @@ function tableEdit(idx) {
 
     function walkUp(src) {
         const contextMenu = src.closest('.contextParent');
+        if (!contextMenu) {
+            return null;
+        }
         const tabId = contextMenu.dataset.owner;
         const obj = contextMenu.target;
         return {col: obj, row: obj.parentNode, table: obj.closest(`#${tabId}`)};
@@ -299,48 +329,21 @@ function tableEdit(idx) {
             cellDictionary = dict;
         },
         theTable: () => theTable,
-        cancelEdit: cancelEdit
+        cancelEdit
     };
     // =======================================
-    // Jumper sub-module 
+    // Jumper sub-module
     // =======================================
     function jumper(table) {
         'use strict';
-
-        // ---------------------------------------
-        // State
-        // ---------------------------------------
         let ri = 0, ci = 0;
-        let theTable;
+        let theTable = (typeof table === 'string') ? document.getElementById(table) : table;
         let nr = 0, nc = 0;
         let escape = false;
         let fake = 0;
         let lastDir = 1;
-
-        // Resolve table
-        if (typeof table === 'string')
-            theTable = document.getElementById(table);
-        else if (typeof table === 'object')
-            theTable = table;
-
         refresh();
-
-        // ---------------------------------------
-        // Public API
-        // ---------------------------------------
-        return {
-            refresh,
-            clickJump,
-            updown,
-            clickHere,
-            escapeEdit,
-            fakeClick
-        };
-
-        // ---------------------------------------
-        // API Functions
-        // ---------------------------------------
-
+        return {refresh, clickJump, updown, clickHere, escapeEdit, fakeClick};
         function refresh() {
             nr = theTable.rows.length;
             nc = theTable.rows[nr - 1].cells.length;
@@ -349,43 +352,39 @@ function tableEdit(idx) {
         function updown(e) {
             escape = false;
             const code = e.keyCode;
-
-            // Track current cell
             const td = e.target.parentNode;
             ri = td.parentNode.rowIndex;
             ci = td.cellIndex;
             nr = theTable.rows.length;
             nc = theTable.rows[ri].cells.length;
-
             switch (code) {
-                case 13: // Enter
-                case 9:  // Tab
+                case 13:
+                case 9:
+                {
                     e.stopPropagation();
                     e.preventDefault();
                     const dir = (code === 9 && e.shiftKey) ? -1 : 1;
-                    td.style.width = '';
                     clickJump(dir);
                     break;
-
-                case 27: // Escape
+                }
+                case 27:
                     escape = true;
                     fake = 0;
                     clickHere(ri, ci);
                     break;
-
-                case 38: // Up
+                case 38:
                     nextRow(-1);
                     break;
-
-                case 40: // Down
+                case 40:
                     nextRow(1);
                     break;
             }
         }
 
         function clickJump(dir) {
-            if (dir === 0)
+            if (dir === 0) {
                 dir = lastDir;
+            }
             lastDir = dir;
             nextCell(dir);
             clickHere(ri, ci);
@@ -410,10 +409,6 @@ function tableEdit(idx) {
             return f;
         }
 
-        // ---------------------------------------
-        // Internal Navigation Helpers
-        // ---------------------------------------
-
         function nextRow(dir) {
             do {
                 ri = (ri + dir + nr) % nr;
@@ -434,5 +429,4 @@ function tableEdit(idx) {
             } while (theTable.rows[ri].cells[ci].tagName !== 'TD');
         }
     }
-
 }

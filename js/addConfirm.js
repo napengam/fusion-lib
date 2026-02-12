@@ -1,3 +1,30 @@
+/**
+ * Usage:
+ *
+ * 1. Add the target class (default: `.need-confirm`) to any element:
+ *
+ *    <button class="need-confirm" data-ask="Are you sure?">
+ *        Delete
+ *    </button>
+ *
+ * 2. Initialize once:
+ *
+ *    addConfirm();
+ *
+ * Behavior:
+ * - Intercepts configured events (default: click, change)
+ * - Shows confirmation dialog
+ * - If confirmed → re-dispatches original event
+ * - If cancelled → blocks action
+ *
+ * Optional:
+ *    addConfirm({
+ *        selector: '.danger',
+ *        events: ['click'],
+ *        confirmFn: customConfirmModal
+ *    });
+ */
+
 function addConfirm(options = {}) {
     // Mapping common event types to correct constructors
     const EVENT_CONSTRUCTOR_MAP = {
@@ -13,7 +40,6 @@ function addConfirm(options = {}) {
         input: Event,
         submit: Event
     };
-
     // --- Singleton guard ---
     if (addConfirm._instance) {
         return addConfirm._instance;
@@ -30,11 +56,12 @@ function addConfirm(options = {}) {
                 no();
             }
         },
-        closeFn: () => {}
+        closeFn: () => {
+        }
     };
 
     const config = Object.assign({}, defaults, options);
-    const { selector, events, confirmFn, closeFn } = config;
+    const {selector, events, confirmFn, closeFn} = config;
 
     // --- Internal state ---
     let currentTarget = null;
@@ -101,11 +128,11 @@ function addConfirm(options = {}) {
         // Emit custom yeschange event
         const val = getElementValue(currentTarget);
         currentTarget.dispatchEvent(
-            new CustomEvent('yeschange', {
-                bubbles: true,
-                detail: { value: val, type: evtType }
-            })
-        );
+                new CustomEvent('yeschange', {
+                    bubbles: true,
+                    detail: {value: val, type: evtType}
+                })
+                );
 
         closeFn();
         currentTarget = null;
@@ -117,11 +144,11 @@ function addConfirm(options = {}) {
         if (currentTarget) {
             const val = getElementValue(currentTarget);
             currentTarget.dispatchEvent(
-                new CustomEvent('nochange', {
-                    bubbles: true,
-                    detail: { value: val, type: currentEventType }
-                })
-            );
+                    new CustomEvent('nochange', {
+                        bubbles: true,
+                        detail: {value: val, type: currentEventType}
+                    })
+                    );
         }
         closeFn();
         currentTarget = null;
@@ -134,6 +161,6 @@ function addConfirm(options = {}) {
     }
 
     // --- Store singleton instance ---
-    addConfirm._instance = { handler };
+    addConfirm._instance = {handler};
     return addConfirm._instance;
 }

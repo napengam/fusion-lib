@@ -169,13 +169,16 @@ function justDialogs(language = 'de') {
      * Public dialog APIs
      * =============================== */
 
-    function myAlert(text) {
+    function myAlert(text,hook=false) {
         const d = dialogFactory.create('alert', {
             title: lt.alert,
             footer: `<button class="fusion-btn fusion-btn-primary" data-action="close">${lt.ok}</button>`
         });
         d.body.innerHTML = text;
         dialogFactory.show(d);
+        if (typeof hook === 'function') {
+            beforeCloseHook = hook;
+        }
     }
 
     function myConfirm(text, yes, no) {
