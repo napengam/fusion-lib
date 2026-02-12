@@ -1,6 +1,6 @@
 <?php
 
-require __DIR__ . '/httpRequest.php';
+require __DIR__ . '/../../php/httpRequest.php';
 
 class dummy {
 
