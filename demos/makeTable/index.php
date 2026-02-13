@@ -31,13 +31,13 @@
 
             function startPage() {
 
-                backend.fetchHTML('tableSpace', 'getTable.php', {}, (recPkg) => {
+                backend.fetchHTML('tableSpace', 'GetTable.php', {}, (recPkg) => {
                     // when page is loaded
 
                     makeSticky('tt*', {col: 0, loff: 0, toff: 0});
                     sortTable('tt*');
                     toolTip();
-                    dialog.myInform('Here we are', false);
+                    dialog.myInform('Here we are',true);
 
 
                 });
