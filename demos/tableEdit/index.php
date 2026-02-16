@@ -24,7 +24,7 @@
                 <th data-rotate >Column 5<br>Active</th>
             </tr>
         </thead>
-        <tbody class='fusion-body'>
+        <tbody class='fusion-table-body'>
             <tr><td></td><td>2asasa</td><td></td><td></td><td>otto@tonne.to</td><td>no</td></tr>
             <tr><td></td><td>2asasa</td><td></td><td>12:55</td><td></td><td>no</td></tr>
             <tr><td>4</td><td>2asasa</td><td>10.06.1954</td><td>0030</td><td></td><td>no</td></tr>
