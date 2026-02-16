@@ -9,6 +9,7 @@ function startGridEdit(t) {
     // inject access to error dialog
     // ******************************************
 
+
     tEdit = tableEdit(t);
     tEdit.setChangeCallBack(changeValue);
     tEdit.setErrorCallBack(teError);
@@ -40,17 +41,17 @@ function startGridEdit(t) {
     // the validtor we pass into the table editor 
     // ****************************************** 
     dictionary = [
-        {name: 'col0', type: 'number'},
-        {name: 'col1', type: 'text'},
-        {name: 'col2', type: 'date', skip: 'yes'},
-        {name: 'col3', type: 'time'},
-        {name: 'col4', type: 'email'},
-        {name: 'col5', type: "select", options: ["Yes", "No", "Maybe"]}
+        {name: 'col0', len: 10, type: 'number'},
+        {name: 'col1', len: 20, type: 'text', confirm: 'yes'},
+        {name: 'col2', len: 10, type: 'date', skip: 'yes'},
+        {name: 'col3', len: 5, type: 'time'},
+        {name: 'col4', len: 60, type: 'email'},
+        {name: 'col5', len: 10, type: "select", options: ["Yes", "No", "Maybe"], confirm: 'no'}
     ];
     // *****************************************
     // merge with default:
     // ******************************************
-    let dictDefault = {name: '', type: 'text', edit: 'yes', must: 'no', skip: 'no', length: ''};
+    let dictDefault = {name: '', type: 'text', edit: 'yes', must: 'no', skip: 'no', length: '', confirm: ''};
     dictionary = dictionary.map((elem) => {
         return Object.assign({}, dictDefault, elem);
     });
@@ -75,8 +76,7 @@ function startGridEdit(t) {
     initResize(t);
     window.calendar = hgsCalendar();
     window.calendar.backEnd('fetchCalendar.php');
-
-
+    addConfirm({confirmFn: dialog.myConfirm});
 
 
 }
