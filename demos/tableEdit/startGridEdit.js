@@ -77,6 +77,5 @@ function startGridEdit(t) {
     window.calendar = hgsCalendar();
     window.calendar.backEnd('fetchCalendar.php');
     addConfirm({confirmFn: dialog.myConfirm});
-
-
+    HGS_CALENDAR.backEnd('fetchCalendar.php');
 }
