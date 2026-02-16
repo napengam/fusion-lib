@@ -258,9 +258,84 @@ function tableEdit(idx) {
             openEditor(nextCell, options);
     }
     }
+
+    // =======================================
+    // Context Menu setup
+    // =======================================
+    let cm = new contextMenuF('', id);
+    cm.addMenu([
+        {id: 'insert', icon: '<i class="fa fa-sign-in-alt fa-flip-horizontal"></i>', label: ' insert row', handler: contextAddRow},
+        {id: 'copy', icon: '<i class="fa fa-reply fa-flip-vertical"></i>', label: ' copy row', handler: contextCopyRow},
+        {id: 'delete', icon: '<i class="fa fa-trash-alt"></i>', label: ' delete row...', handler: contextDeleteRow}
+    ]);
+
+    // =======================================
+    // Delegated Event Binding
+    // =======================================
+    theTable.tBodies[0].addEventListener('contextmenu', handleContextMenu);
+    // =======================================
+    // Core Handlers
+    // =======================================
+    function handleContextMenu(e) {
+        if (!e.target.closest('td'))
+            return;
+
+        if (theTable.dataset.ininput) {
+            [ri, ci] = rici();
+            const cell = theTable.rows[ri].cells[ci];
+            cell.innerHTML = cell.dataset.oldvalue;
+            theTable.dataset.ininput = '';
+            cell.removeAttribute('data-editcursor');
+        }
+        cm.open(e);
+    }
+
+    // =======================================
+    // Context Menu Handlers
+    // =======================================
+    function contextAddRow(e) {
+        const here = walkUp(e.target);
+        const newRow = here.table.insertRow(here.row.rowIndex);
+        [...here.row.cells].forEach(() => newRow.insertCell());
+        newRow.cells[0].innerHTML = 'W';
+        const height = newRow.cells[0].clientHeight;
+        newRow.cells[0].innerHTML = '';
+        newRow.cells[0].style.height = height + 'px';
+
+        return newRow.rowIndex;
+    }
+
+    function contextDeleteRow(e) {
+        confirmCallBack('Delete row?', () => {
+            const here = walkUp(e.target);
+            here.table.deleteRow(here.row.rowIndex);
+
+        }, () => {
+        });
+    }
+
+    function contextCopyRow(e) {
+        const here = walkUp(e.target);
+        const newRow = here.table.insertRow(here.row.rowIndex);
+        [...here.row.cells].forEach((cell, i) => {
+            newRow.insertCell();
+            newRow.cells[i].innerHTML = cell.innerHTML;
+        });
+        newRow.cells[0].style.height = '18px';
+
+        return newRow.rowIndex;
+    }
+
+
     // =======================================
     // Utilities
     // =======================================
+    function walkUp(src) {
+        const contextMenu = src.closest('.contextParent');
+        const tabId = contextMenu.dataset.owner;
+        const obj = contextMenu.target;
+        return {col: obj, row: obj.parentNode, table: obj.closest(`#${tabId}`)};
+    }
     function getTD(obj) {
         let td = obj.closest('td');
         if (!td) {
