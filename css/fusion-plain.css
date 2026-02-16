@@ -17,9 +17,11 @@
     border: 1px solid #bbb;
     padding: 0.4rem 0.5rem;
     vertical-align: top;
-    background-color:inherit
+    background-color:white;
 }
-
+.fusion-table th{
+    background-color:lightgrey;
+}
 .fusion-table-head {
     background: lightgrey;
 }
