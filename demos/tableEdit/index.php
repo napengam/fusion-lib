@@ -68,6 +68,7 @@
     <script src="../../js/myBackend.js"></script>
     <script src="../../js/calendarium.js"></script>
     <script src="../../js/validator.js"></script>
+    <script src="../../js/addConfirm.js"></script>
 
     <script src="../../js/basicTableEdit.js"></script>
     <script src="startGridEdit.js"></script>
