@@ -49,9 +49,17 @@ function tableEdit(idx) {
         let options = '';
         let leftOverEditor = theTable.querySelector('.theField');
         if (leftOverEditor) {
-            let oldtd = leftOverEditor.parentNode;
-            leftOverEditor.remove();
-            oldtd.innerHTML = oldtd.dataset.oldvalue;
+            // *****************************************
+            // cleanup 
+            // ******************************************
+            if (editing.editor.changed()) {
+                editing.editor.commit('click');
+                leftOverEditor.remove();
+            } else {
+                let oldtd = leftOverEditor.parentNode;
+                leftOverEditor.remove();
+                oldtd.innerHTML = oldtd.dataset.oldvalue;
+            }
         }
 
         if (cellDictionary) {
@@ -143,7 +151,7 @@ function tableEdit(idx) {
         let originalValue = getValueFromParent();
         td.dataset.oldvalue = td.innerHTML;
         let confirmClass = options?.confirm === 'yes' ? 'need-confirm' : '';
-        td.innerHTML = `<input class="theField ${confirmClass}"
+        td.innerHTML = `<input id='theField' class="theField ${confirmClass}"
             type="text"
             value="${originalValue}"
             data-master='change'
@@ -151,6 +159,9 @@ function tableEdit(idx) {
             maxlength="${options?.len || 50}"
             size="${options?.len || 20}">`;
         let node = td.querySelector('.theField');
+        if (options.type === 'date') {
+            node.onclick = HGS_CALENDAR.fetchCalendar(null, null, 'theField');
+        }
         return {
             node,
             changed() {
@@ -218,6 +229,9 @@ function tableEdit(idx) {
     // Navigation
     // =======================================
     function navigateFrom(td, next = 'Tab') {
+        if (next === 'click') {
+            return;
+        }
         let ri = td.parentNode.rowIndex;
         let ci = td.cellIndex;
         let nc = td.parentElement.cells.length;
