@@ -1,3 +1,4 @@
+export { justDialogs }
 function justDialogs(language = 'de') {
 
     if (justDialogs._instance) {
@@ -56,6 +57,24 @@ function justDialogs(language = 'de') {
         dlg.style.left = `${(window.innerWidth - rect.width) / 2}px`;
         dlg.style.top = `${(window.innerHeight - rect.height) / 2}px`;
     }
+    function positionNearElement(dlg, anchor) {
+        const rect = anchor.getBoundingClientRect();
+        const padding = 8;
+        let left = rect.right + window.scrollX + padding;
+        let top = rect.top + window.scrollY;
+        const maxRight = window.scrollX + window.innerWidth;
+        const maxBottom = window.scrollY + window.innerHeight;
+        if (left + dlg.offsetWidth > maxRight) {
+            left = rect.left + window.scrollX - dlg.offsetWidth - padding;
+        }
+        if (top + dlg.offsetHeight > maxBottom) {
+            top = maxBottom - dlg.offsetHeight - padding;
+        }
+        dlg.style.position = 'absolute';
+        dlg.style.margin = '0';
+        dlg.style.left = left + 'px';
+        dlg.style.top = top + 'px';
+    }
 
     function makeDraggable(dialog, handle) {
         let startX = 0;
@@ -67,7 +86,7 @@ function justDialogs(language = 'de') {
 
         handle.addEventListener('pointerdown', (e) => {
 
-            if (e.target.closest('.fusion-dialog-close')) {         
+            if (e.target.closest('.fusion-dialog-close')) {
                 return;
             }
 
@@ -161,7 +180,6 @@ function justDialogs(language = 'de') {
                 }
             });
 
-            dlg.draggable = true;
             makeDraggable(dlg, dlg.querySelector('.fusion-dialog-drag'));
 
             const inst = {wrap, dlg, body};
@@ -170,6 +188,7 @@ function justDialogs(language = 'de') {
         }
 
         function show(inst, modal = true) {
+            myClose();
             if (modal) {
                 inst.dlg.showModal();
             } else {
@@ -209,7 +228,10 @@ function justDialogs(language = 'de') {
 
         d.body.innerHTML = text;
 
-        d.dlg.addEventListener('dialog-action', (e) => {
+        if (d.dlg.fu) {
+            d.dlg.removeEventListener('dialog-action', d.dlg.fu);
+        }
+        d.dlg.fu = function (e) {
             if (e.detail === 'yes') {
                 yes?.();
             }
@@ -217,7 +239,8 @@ function justDialogs(language = 'de') {
                 no?.();
             }
             d.dlg.close();
-        }, {once: true});
+        };
+        d.dlg.addEventListener('dialog-action', d.dlg.fu);
 
         dialogFactory.show(d);
     }
@@ -239,13 +262,16 @@ function justDialogs(language = 'de') {
         const input = d.dlg.querySelector('[name=v]');
         input.value = defaultValue;
 
-        d.dlg.addEventListener('dialog-action', (e) => {
+        if (d.dlg.fu) {
+            d.dlg.removeEventListener('dialog-action', d.dlg.fu);
+        }
+        d.dlg.fu = function (e) {
             if (e.detail === 'save') {
                 save(input.value);
                 d.dlg.close();
             }
-        }, {once: true});
-
+        };
+        d.dlg.addEventListener('dialog-action', d.dlg.fu);
         dialogFactory.show(d);
     }
 
@@ -265,7 +291,10 @@ function justDialogs(language = 'de') {
             <input class="fusion-input" type="password" name="p" autocomplete="current-password">
         `;
 
-        d.dlg.addEventListener('dialog-action', (e) => {
+        if (d.dlg.fu) {
+            d.dlg.removeEventListener('dialog-action', d.dlg.fu);
+        }
+        d.dlg.fu = function (e) {
             if (e.detail === 'login') {
                 save(
                         d.dlg.querySelector('[name=u]').value,
@@ -273,7 +302,8 @@ function justDialogs(language = 'de') {
                         );
                 d.dlg.close();
             }
-        }, {once: true});
+        };
+        d.dlg.addEventListener('dialog-action', d.dlg.fu);
 
         dialogFactory.show(d);
     }
@@ -292,6 +322,43 @@ function justDialogs(language = 'de') {
             setTimeout(() => d.dlg.close(), 3500);
     }
     }
+    function myCommentEditor(text, anchorEl, save) {
+        const d = dialogFactory.create('comment', {
+            title: 'Comment',
+            footer: `
+            <button class="fusion-btn fusion-btn-primary" data-action="save">Save</button>
+            <button class="fusion-btn" data-action="close">Cancel</button>
+        `
+        });
+        d.body.innerHTML = `
+        <textarea class="fusion-input" style="width:100%;min-height:120px;"></textarea>
+    `;
+        const ta = d.dlg.querySelector('textarea');
+        ta.value = text || '';
+        if (d.dlg.fu) {
+            d.dlg.removeEventListener('dialog-action', d.dlg.fu);
+        }
+        d.dlg.fu = function (e) {
+            if (e.detail === 'save') {
+                save(ta.value.trim());
+                d.dlg.close();
+            }
+        };
+
+        d.dlg.addEventListener('dialog-action', d.dlg.fu);
+        dialogFactory.show(d, false);
+        positionNearElement(d.dlg, anchorEl);
+    }
+    function myCommentViewer(text, anchorEl) {
+        const d = dialogFactory.create('comment-view', {
+            title: 'Comment',
+            footer: `<button class="fusion-btn" data-action="close">Close</button>`
+        });
+        d.body.innerHTML = text.replace(/\n/g, '<br>');
+        dialogFactory.show(d, false);
+        positionNearElement(d.dlg, anchorEl);
+    }
+
     function myUpload(text, actionUrl, responds, hiddenFields = {}) {
         const d = dialogFactory.create('upload', {
             title: lt.upload,
@@ -359,12 +426,12 @@ function justDialogs(language = 'de') {
     }
 
     function myClose() {
-        let d = document.querySelector('Dialog');
-        if (d) {
-            d.close();
-        }
-    }
+        document.querySelectorAll('Dialog').forEach((elem) => {
+            elem.close();
+        });
 
+
+    }
 
     /* ===============================
      * Public API
@@ -375,6 +442,8 @@ function justDialogs(language = 'de') {
         myPrompt,
         myLogin,
         myInform,
+        myCommentEditor,
+        myCommentViewer,
         myUpload,
         myClose
     };
