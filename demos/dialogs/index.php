@@ -24,7 +24,7 @@
         </div>
 
 
-        <script src="../../js/justDialogs.js"></script>   
+           <script src="../../js/justDialogs.js"></script>
         <script>
 
                             theDialogs = justDialogs();
