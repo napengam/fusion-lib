@@ -1,4 +1,3 @@
-export { justDialogs }
 function justDialogs(language = 'de') {
 
     if (justDialogs._instance) {
