@@ -120,6 +120,7 @@ class PDODB {
         }
 
         $result = $stmt->fetchAll($map[$mode]);
+        $this->rowCount = $stmt->rowCount();
         $stmt->closeCursor();
 
         return $result;
@@ -159,6 +160,10 @@ class PDODB {
         return $record;
     }
 
+    public function rowCount() {
+        return $this->rowCount;
+    }
+
     /* ---------------------------
       Statement caching
       ---------------------------- */
@@ -195,12 +200,7 @@ class PDODB {
     public function insert(string $table, array|object|null $data = null): int {
         $data = is_object($data) ? (array) $data : ($data ?? []);
 
-        if (empty($data)) {
-            throw new InvalidArgumentException("Insert data cannot be empty for table '$table'.");
-        }
-
-        $usePublicId = array_key_exists('public_id', $data);
-
+        $usePublicId = $this->tableHasColumn($table, 'public_id');
         // PDODB fully owns public_id
         if ($usePublicId) {
             $data['public_id'] = bin2hex(random_bytes(16));
@@ -232,9 +232,29 @@ class PDODB {
         }
     }
 
+    public function tableHasColumn(string $table, string $column): bool {
+        $sql = "
+        SELECT COUNT(*)
+        FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = :table
+          AND COLUMN_NAME = :column
+    ";
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([':table' => $table,
+            ':column' => $column,
+        ]);
+
+        return (int) $stmt->fetchColumn() > 0;
+    }
+
     public function buildInsertSql(string $table, array $data): string {
         if (empty($data)) {
             throw new InvalidArgumentException("Insert data cannot be empty for table '$table'.");
+        }
+        if (!preg_match('/^[a-zA-Z0-9_]+$/', $table)) {
+            throw new InvalidArgumentException("Invalid table name.");
         }
 
         $cols = array_keys($data);
@@ -250,6 +270,10 @@ class PDODB {
 
     public function buildUpdateSql(string $table, array $data): string {
         $cols = array_keys($data);
+        
+        if (!preg_match('/^[a-zA-Z0-9_]+$/', $table)) {
+            throw new InvalidArgumentException("Invalid table name.");
+        }
 
         // Generate SET clause
         $setClauses = array_map(
