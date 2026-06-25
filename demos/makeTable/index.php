@@ -26,9 +26,6 @@
             let backend = myBackend();
             let dialog = justDialogs('de', 'bulma');
 
-
-
-
             function startPage() {
 
                 backend.fetchHTML('tableSpace', 'GetTable.php', {}, (recPkg) => {

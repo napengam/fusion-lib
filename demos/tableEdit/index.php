@@ -7,7 +7,7 @@
         <!-- fusion-lib baseline -->
         <link rel="stylesheet" href="/fusion-lib/css/fusion-plain.css">
 
-        <title>Login</title>
+        <title>Demo Grid</title>
     </head>
 
     <table id='t' class='fusion-table fusion-table-fit'>

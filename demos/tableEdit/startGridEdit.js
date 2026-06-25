@@ -11,7 +11,7 @@ function startGridEdit(t) {
 
 
     tEdit = tableEdit(t);
-    tEdit.setChangeCallBack(changeValue);
+    tEdit.setUpdateCallBack(changeValue);
     tEdit.setErrorCallBack(teError);
     tEdit.setConfirmCallBack(teConfirm);
 
@@ -46,7 +46,7 @@ function startGridEdit(t) {
         {name: 'col2', len: 10, type: 'date', skip: 'yes'},
         {name: 'col3', len: 5, type: 'time'},
         {name: 'col4', len: 60, type: 'email'},
-        {name: 'col5', len: 10, type: "select", options: ["Yes", "No", "Maybe"], confirm: 'no'}
+        {name: 'col5', len: 10, type: "select", options: ["Yes", "No", "Maybe"], confirm: 'yes'}
     ];
     // *****************************************
     // merge with default:
@@ -74,8 +74,8 @@ function startGridEdit(t) {
     // make cells resizable
     // ******************************************
     initResize(t);
-    window.calendar = hgsCalendar();
-    window.calendar.backEnd('fetchCalendar.php');
+//    window.calendar = hgsCalendar();
+//    window.calendar.backEnd('fetchCalendar.php');
     addConfirm({confirmFn: dialog.myConfirm});
     HGS_CALENDAR.backEnd('fetchCalendar.php');
 }
