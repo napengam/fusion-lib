@@ -1,5 +1,15 @@
 <?php
 
+/**
+ * MakeTable generates dynamic HTML tables with built-in filtering, printing,
+ * and customizable structure. Features include:
+ * - Automatic table header initialization on first row output
+ * - Configurable title, headline, and footer lines
+ * - Per-column filtering with search inputs
+ * - Print functionality trigger
+ * - Support for cell attributes and custom rendering
+ * - Secure HTML escaping of all cell values
+ */
 declare(strict_types=1);
 
 class MakeTable {
@@ -114,6 +124,6 @@ HTML;
         $attr = $cell['atrib'] ?? $cell[0] ?? '';
         $val = $cell['value'] ?? $cell[1] ?? '';
 
-        return "<$tag $attr>$val</$tag>";
+        return "<$tag $attr>" . htmlspecialchars($val) . "</$tag>";
     }
 }

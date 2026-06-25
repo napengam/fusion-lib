@@ -1,5 +1,16 @@
 <?php
 
+/**
+ * LoginUser class provides comprehensive authentication functionality including:
+ * - Secure session management with timeout enforcement
+ * - Login/logout flows with CSRF protection
+ * - Password verification with legacy MD5 migration support
+ * - Role-based permission checking
+ * - Secure session initialization and hardening
+ * - Configurable authentication table/field mappings
+ * - Automatic password hash upgrading
+ * - Public route whitelisting
+ */
 class LoginUser {
 
     private PDO $db;

@@ -1,5 +1,19 @@
 <?php
 
+/**
+ * PDODB is a robust PDO database abstraction layer that provides:
+ * - Singleton-based connection management with configurable instances
+ * - Prepared statement caching for improved performance
+ * - Transaction handling with nested transaction support
+ * - Table locking mechanisms for concurrent operations
+ * - Automatic public_id generation for insert operations
+ * - SQL query building utilities (INSERT, UPDATE)
+ * - Date column detection and empty record generation
+ * - Global emergency cleanup for rollback/unlock operations
+ * - Secure parameter binding and error handling
+ * - Row count tracking and last insert ID management
+ * - Database schema inspection utilities
+ */
 class PDODB {
 
     private PDO $pdo;
@@ -270,7 +284,7 @@ class PDODB {
 
     public function buildUpdateSql(string $table, array $data): string {
         $cols = array_keys($data);
-        
+
         if (!preg_match('/^[a-zA-Z0-9_]+$/', $table)) {
             throw new InvalidArgumentException("Invalid table name.");
         }

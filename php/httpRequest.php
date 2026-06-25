@@ -1,5 +1,16 @@
 <?php
-
+/**
+ * httpRequest trait provides robust HTTP request handling with:
+ * - Automatic request method validation (GET, POST, PUT, DELETE)
+ * - JSON request parsing with strict content-type checking
+ * - CSRF token verification for state-changing operations
+ * - Structured error handling with standardized response format
+ * - Early response release pattern for background processing
+ * - Output buffering and connection management
+ * - Type-safe JSON encoding with UTF-8 safety
+ * - Response object merging with guaranteed error/result fields
+ * - HTTP status code enforcement for invalid requests
+ */
 trait httpRequest {
 
     public $param;

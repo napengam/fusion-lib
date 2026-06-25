@@ -1,11 +1,20 @@
 <?php
 
-final class GetAllConfig
-{
+/**
+ * GetAllConfig loads and parses project configuration from INI files with:
+ * - Automatic project path resolution and caching
+ * - Placeholder replacement (__DOCUMENT_ROOT__, __URL__)
+ * - Runtime environment detection (CLI vs web server)
+ * - HTTPS/HTTP protocol detection
+ * - Type-safe INI parsing with fallback validation
+ * - Singleton-style caching to prevent repeated file reads
+ * - Comprehensive error handling for missing files and invalid syntax
+ */
+final class GetAllConfig {
+
     private static array $cache = [];
 
-    public static function load(string $project = ''): array
-    {
+    public static function load(string $project = ''): array {
         if (empty($project)) {
             throw new RuntimeException("Missing project directory name");
         }
@@ -40,9 +49,9 @@ final class GetAllConfig
 
         // Replace placeholders
         $raw = str_replace(
-            ['__DOCUMENT_ROOT__', '__URL__'],
-            [$basePath, self::getProjectUrl($project, $basePath)],
-            $raw
+                ['__DOCUMENT_ROOT__', '__URL__'],
+                [$basePath, self::getProjectUrl($project, $basePath)],
+                $raw
         );
 
         // Parse configuration
@@ -55,8 +64,7 @@ final class GetAllConfig
         return self::$cache[$cacheKey] = $parsed;
     }
 
-    private static function getProjectUrl(string $project, string $basePath): string
-    {
+    private static function getProjectUrl(string $project, string $basePath): string {
         // Fallback for CLI
         if (PHP_SAPI === 'cli') {
             return "file://$basePath/$project/";
@@ -64,18 +72,18 @@ final class GetAllConfig
 
         $protocol = 'http://';
         if (
-            (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ||
-            ($_SERVER['SERVER_PORT'] ?? 80) == 443 ||
-            (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')
+                (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ||
+                ($_SERVER['SERVER_PORT'] ?? 80) == 443 ||
+                (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')
         ) {
             $protocol = 'https://';
         }
 
         $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-        $uri  = $_SERVER['REQUEST_URI'] ?? "/$project/";
+        $uri = $_SERVER['REQUEST_URI'] ?? "/$project/";
 
         $urlParts = explode("/$project/", $uri);
-        $rootUrl  = rtrim($protocol . $host . $urlParts[0], '/');
+        $rootUrl = rtrim($protocol . $host . $urlParts[0], '/');
 
         return "$rootUrl/$project/";
     }
