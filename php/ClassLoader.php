@@ -24,9 +24,9 @@ class ClassLoader {
     /**
      * Initialize the autoloader.
      */
-    public static function load(string $projectFolder, array $paths): void {
+    public static function load(string $oneBelowProjectFolder, array $paths): void {
         $baseDir = dirname(__DIR__);
-        $basePath = self::findBasePath($baseDir, $projectFolder);
+        $basePath = self::findBasePath($baseDir, $oneBelowProjectFolder);
 
         if (!$basePath) {
             throw new Exception("Base path containing '{$projectFolder}' not found.");
@@ -83,14 +83,8 @@ class ClassLoader {
         $routes = [];
 
         foreach ($paths as $path) {
-            $fullPath = self::resolvePath($basePath, $path);
-
-            if (!is_dir($fullPath)) {
-                continue;
-            }
-
             $rii = new RecursiveIteratorIterator(
-                    new RecursiveDirectoryIterator($fullPath, FilesystemIterator::SKIP_DOTS)
+                    new RecursiveDirectoryIterator("$basePath/$path", FilesystemIterator::SKIP_DOTS)
             );
 
             foreach ($rii as $file) {
@@ -107,11 +101,9 @@ class ClassLoader {
                         'mtime' => filemtime($filePath),
                     ];
 
-                    if (strpos($filePath, '/GUI/') !== false ||
-                            strpos($filePath, '/Api/') !== false ||
-                            strpos($filePath, '/Controller/') !== false) {
                         // Router: store naked class name as key
                         $short = basename(str_replace('\\', '/', $def));
+                    if (strpos($filePath, '/GUI/') !== false || strpos($filePath, '/Api/') !== false) {
                         $routes[$short] = $filePath;
                     }
                 }
@@ -194,35 +186,32 @@ class ClassLoader {
         );
     }
 
-    /**
-     * Resolve relative or absolute directory paths consistently.
+    /*
+     * ***********************************************
+     * $targetDir must be a directory just one 
+     * below project directory 
+     * **********************************************
      */
-    private static function resolvePath(string $basePath, string $path): string {
-        // If path starts with "/" (Unix) or drive letter (Windows), treat as absolute
-        if (str_starts_with($path, DIRECTORY_SEPARATOR) || preg_match('/^[A-Z]:[\\\\\\/]/i', $path)) {
-            return rtrim($path, DIRECTORY_SEPARATOR);
+
+    private static function findBasePath(string $startDir, string $targetDir): string {
+        $dir = realpath($startDir);
+        $arr = explode('/', $targetDir);
+        $targetDir = $arr[count($arr) - 1];
+
+        while ($dir !== false) {
+            if (is_dir($dir . DIRECTORY_SEPARATOR . $targetDir)) {
+                return $dir;
         }
 
-        // Otherwise, treat as relative to base
-        $resolved = rtrim($basePath, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $path;
-        return realpath($resolved) ?: $resolved;
+            $parent = dirname($dir);
+            if ($parent === $dir) {
+                break;
     }
 
-    /**
-     * Finds the base project directory by folder name.
-     */
-    private static function findBasePath(string $startPath, string $targetFolder): ?string {
-        $parts = explode(DIRECTORY_SEPARATOR, $startPath);
-        $path = [];
-
-        foreach ($parts as $part) {
-            $path[] = $part;
-            if ($part === $targetFolder) {
-                return implode(DIRECTORY_SEPARATOR, $path);
+            $dir = $parent;
             }
-        }
 
-        return null;
+        throw new Exception('Project root not found');
     }
 
     // -------------------------------
@@ -249,7 +238,7 @@ class ClassLoader {
         $routes = self::$mapCache['routes'] ?? [];
 
         if (!isset($routes[$shortName])) {
-            // Rebuild route map if missing
+            // ?Rebuild route map if missing
             $map = self::buildAutoloadMap(self::$basePath, self::$paths, self::$mapFile);
             self::$mapCache = $map;
             $routes = $map['routes'] ?? [];
