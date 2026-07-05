@@ -34,82 +34,65 @@ class ClassLoader {
      * Initialize the autoloader.
      */
     public static function load(string $anchor, array $paths): void {
-        $baseDir = dirname(__DIR__);
+        $baseDir = realpath($_SERVER['SCRIPT_FILENAME'] ?? getcwd());
         $basePath = self::findProjectFolder($baseDir, $anchor);
-
         if (!$basePath) {
             throw new Exception("Base path containing '{$projectFolder}' not found.");
         }
-
         $autoloadDir = $basePath . '/autoload';
         $mapFile = $autoloadDir . '/autoload_map.php';
-
         self::$basePath = $basePath;
         self::$paths = $paths;
         self::$mapFile = $basePath . '/autoload/autoload_map.php';
-
         if (!is_dir($autoloadDir)) {
             mkdir($autoloadDir, 0775, true);
         }
-
         // Load or build unified map
         $map = is_file($mapFile) ? require $mapFile : self::buildAutoloadMap($basePath, $paths, $mapFile);
-
         self::$mapCache = $map;
         $classMap = $map['classes'];
-
         // Register PSR-like autoloader
         spl_autoload_register(function ($class) use (&$classMap, $basePath, $paths, $mapFile) {
             $entry = $classMap[$class] ?? null;
-
             if ($entry && is_file($entry['file'])) {
                 if (filemtime($entry['file']) === $entry['mtime']) {
                     require_once $entry['file'];
                     return;
                 }
             }
-
             // Rebuild map if missing/outdated
             $map = self::buildAutoloadMap($basePath, $paths, $mapFile);
             self::$mapCache = $map;
             $classMap = $map['classes'];
-
             $entry = $classMap[$class] ?? null;
             if ($entry && is_file($entry['file'])) {
                 require_once $entry['file'];
                 return;
             }
-
             throw new Exception("Class '{$class}' not found or outdated.");
         });
     }
-
     /**
      * Build unified map and write to disk.
      */
     private static function buildAutoloadMap(string $basePath, array $paths, string $mapFile): array {
         $classes = [];
         $routes = [];
-
         foreach ($paths as $path) {
             $rii = new RecursiveIteratorIterator(
                     new RecursiveDirectoryIterator("$basePath/$path", FilesystemIterator::SKIP_DOTS)
             );
-
             foreach ($rii as $file) {
                 if (!$file->isFile() || $file->getExtension() !== 'php') {
                     continue;
                 }
-
                 $filePath = str_replace('\\', '/', $file->getPathname());
                 $defs = self::extractDefinitions($filePath);
-
                 foreach ($defs as $def) {
                     $classes[$def] = [
                         'file' => $filePath,
                         'mtime' => filemtime($filePath),
                     ];
-
                     // Router: store naked class name as key
                     $short = basename(str_replace('\\', '/', $def));
                     if (strpos($filePath, '/GUI/') !== false || strpos($filePath, '/Api/') !== false) {
@@ -118,15 +101,12 @@ class ClassLoader {
                 }
             }
         }
-
         ksort($classes);
         ksort($routes);
-
         $data = [
             'classes' => $classes,
             'routes' => $routes,
         ];
-
         self::writeMapFile($mapFile, $data);
         return $data;
     }
@@ -138,17 +118,14 @@ class ClassLoader {
         if (!is_file($file) || pathinfo($file, PATHINFO_EXTENSION) !== 'php') {
             return [];
         }
-
         $contents = file_get_contents($file);
         $tokens = token_get_all($contents);
         $defs = [];
         $namespace = '';
-
         for ($i = 0; $i < count($tokens); $i++) {
             if (!is_array($tokens[$i])) {
                 continue;
             }
-
             // Capture namespace
             if ($tokens[$i][0] === T_NAMESPACE) {
                 $namespace = '';
@@ -161,14 +138,12 @@ class ClassLoader {
                     }
                 }
             }
-
             // Capture class/interface/trait
             if (in_array($tokens[$i][0], [T_CLASS, T_INTERFACE, T_TRAIT], true)) {
                 $prev = $tokens[$i - 1] ?? null;
                 if ($tokens[$i][0] === T_CLASS && is_array($prev) && $prev[0] === T_NEW) {
                     continue; // Skip anonymous
                 }
-
                 for ($j = $i + 1; $j < count($tokens); $j++) {
                     if (is_array($tokens[$j]) && $tokens[$j][0] === T_STRING) {
                         $name = $tokens[$j][1];
@@ -178,10 +153,8 @@ class ClassLoader {
                 }
             }
         }
-
         return $defs;
     }
-
     /**
      * Writes the unified autoload map file.
      */
@@ -202,19 +175,16 @@ class ClassLoader {
      * **********************************************
      */
 
-    private static function findProjectFolder(string $startPath, string $anchorPath): string {
-        $dir = realpath($startPath);
-        if ($dir === false) {
-            throw new Exception('Invalid start path');
-        }
-        $anchor = basename(rtrim($anchorPath, '/\\'));
+    private static function findProjectFolder(string $startDir, string $anchor): string {
+        $dir = $startDir;
         while ($dir !== dirname($dir)) {
             if (file_exists($dir . DIRECTORY_SEPARATOR . $anchor)) {
                 return $dir;
             }
             $dir = dirname($dir);
         }
-        throw new Exception("Anchor '{$anchor}' not found from '{$startPath}'");
+
+        throw new Exception("Project root containing '{$anchor}' not found.");
     }
 
     // -------------------------------
