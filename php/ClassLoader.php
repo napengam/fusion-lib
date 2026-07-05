@@ -101,8 +101,8 @@ class ClassLoader {
                         'mtime' => filemtime($filePath),
                     ];
 
-                        // Router: store naked class name as key
-                        $short = basename(str_replace('\\', '/', $def));
+                    // Router: store naked class name as key
+                    $short = basename(str_replace('\\', '/', $def));
                     if (strpos($filePath, '/GUI/') !== false || strpos($filePath, '/Api/') !== false) {
                         $routes[$short] = $filePath;
                     }
@@ -193,25 +193,19 @@ class ClassLoader {
      * **********************************************
      */
 
-    private static function findBasePath(string $startDir, string $targetDir): string {
-        $dir = realpath($startDir);
-        $arr = explode('/', $targetDir);
-        $targetDir = $arr[count($arr) - 1];
-
-        while ($dir !== false) {
-            if (is_dir($dir . DIRECTORY_SEPARATOR . $targetDir)) {
-                return $dir;
+    private static function findBasePath(string $startPath, string $anchorPath): string {
+        $dir = realpath($startPath);
+        if ($dir === false) {
+            throw new Exception('Invalid start path');
         }
-
-            $parent = dirname($dir);
-            if ($parent === $dir) {
-                break;
-    }
-
-            $dir = $parent;
+        $anchor = basename(rtrim($anchorPath, '/\\'));
+        while ($dir !== dirname($dir)) {
+            if (file_exists($dir . DIRECTORY_SEPARATOR . $anchor)) {
+                return $dir;
             }
-
-        throw new Exception('Project root not found');
+            $dir = dirname($dir);
+        }
+        throw new Exception("Anchor '{$anchor}' not found from '{$startPath}'");
     }
 
     // -------------------------------
