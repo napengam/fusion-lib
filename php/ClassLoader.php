@@ -55,41 +55,63 @@ class ClassLoader {
      * Initialize the autoloader.
      */
     public static function load(string $anchor, array $paths): void {
-        $baseDir = realpath($_SERVER['SCRIPT_FILENAME'] ?? getcwd());
-        $basePath = self::findProjectFolder($baseDir, $anchor);
+        if (!empty(self::$mapCache)) {
+            return; // already initialized (cache)
+        }
+
+        // robust start dir (CLI + web)
+        $start = $_SERVER['SCRIPT_FILENAME'] ?? getcwd();
+        $startDir = is_file($start) ? dirname($start) : $start;
+
+        // symlink-safe
+        $startDir = realpath($startDir) ?: $startDir;
+
+        $basePath = self::findProjectFolder($startDir, 'autoload');
+
         if (!$basePath) {
             throw new Exception("Base path containing '{$anchor}' not found.");
         }
+
         $autoloadDir = $basePath . '/autoload';
         $mapFile = $autoloadDir . '/autoload_map.php';
+
         self::$basePath = $basePath;
         self::$paths = $paths;
         self::$mapFile = $mapFile;
+
         if (!is_dir($autoloadDir)) {
             mkdir($autoloadDir, 0775, true);
         }
-        // Load or build unified map
+
+        // load or build map
         $map = is_file($mapFile) ? require $mapFile : self::buildAutoloadMap($basePath, $paths, $mapFile);
+
         self::$mapCache = $map;
         $classMap = $map['classes'];
-        // Register PSR-like autoloader
+
         spl_autoload_register(function ($class) use (&$classMap, $basePath, $paths, $mapFile) {
+
             $entry = $classMap[$class] ?? null;
+
             if ($entry && is_file($entry['file'])) {
                 if (filemtime($entry['file']) === $entry['mtime']) {
                     require_once $entry['file'];
                     return;
                 }
             }
-            // Rebuild map if missing/outdated
+
+            // rebuild only when needed
             $map = self::buildAutoloadMap($basePath, $paths, $mapFile);
             self::$mapCache = $map;
             $classMap = $map['classes'];
+
             $entry = $classMap[$class] ?? null;
+
             if ($entry && is_file($entry['file'])) {
                 require_once $entry['file'];
                 return;
             }
+
             throw new Exception("Class '{$class}' not found or outdated.");
         });
     }
@@ -200,11 +222,25 @@ class ClassLoader {
 
     private static function findProjectFolder(string $startDir, string $anchor): string {
         $dir = $startDir;
+        $found = null;
+
         while ($dir !== dirname($dir)) {
-            if (file_exists($dir . DIRECTORY_SEPARATOR . $anchor)) {
-                return $dir;
+
+            // ✅ resolve real path (symlink-safe)
+            $realDir = realpath($dir) ?: $dir;
+
+            $path = $realDir . DIRECTORY_SEPARATOR . $anchor;
+
+            if (file_exists($path)) {
+                // ✅ keep updating → highest wins
+                $found = $realDir;
             }
+
             $dir = dirname($dir);
+        }
+
+        if ($found !== null) {
+            return $found;
         }
 
         throw new Exception("Project root containing '{$anchor}' not found.");
