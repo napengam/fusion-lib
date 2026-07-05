@@ -72,17 +72,32 @@ final class GetAllConfig {
      * **********************************************
      */
 
-    private static function findProjectFolder(string $startDir, string $anchor): string {
+     private static function findProjectFolder(string $startDir, string $anchor): string {
         $dir = $startDir;
+        $found = null;
+
         while ($dir !== dirname($dir)) {
-            if (file_exists($dir . DIRECTORY_SEPARATOR . $anchor)) {
-                return $dir;
+
+            // resolve real path (symlink-safe)
+            $realDir = realpath($dir) ?: $dir;
+
+            $path = $realDir . DIRECTORY_SEPARATOR . $anchor;
+
+            if (file_exists($path)) {
+                // keep updating → highest wins
+                $found = $realDir;
             }
+
             $dir = dirname($dir);
+        }
+
+        if ($found !== null) {
+            return $found;
         }
 
         throw new Exception("Project root containing '{$anchor}' not found.");
     }
+
 
     private static function getProjectUrl(string $project, string $basePath): string {
         // Fallback for CLI

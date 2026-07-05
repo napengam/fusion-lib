@@ -23,15 +23,11 @@
  * Project root detection
  * ----------------------
  * The project root is determined by walking upwards from the start directory
- * until we find a directory that directly contains the given $anchor
- * (file or directory name).
+ * until we find a directory named 'auatoload' on the highest level
  *
  * Requirements:
  *   - $anchor must exist directly inside the project root, e.g.:
- *         /project_root/
- *             $anchor
- *             src/
- *             autoload/
+ *         /project_root/autoload/
  *   - If no ancestor directory contains $anchor as an immediate child,
  *     detection fails and an exception is thrown.
  *
@@ -54,7 +50,7 @@ class ClassLoader {
     /**
      * Initialize the autoloader.
      */
-    public static function load(string $anchor, array $paths): void {
+    public static function load(array $paths): void {
         if (!empty(self::$mapCache)) {
             return; // already initialized (cache)
         }
@@ -69,7 +65,7 @@ class ClassLoader {
         $basePath = self::findProjectFolder($startDir, 'autoload');
 
         if (!$basePath) {
-            throw new Exception("Base path containing '{$anchor}' not found.");
+            throw new Exception("Base path containing 'autolad' not found.");
         }
 
         $autoloadDir = $basePath . '/autoload';
@@ -226,13 +222,13 @@ class ClassLoader {
 
         while ($dir !== dirname($dir)) {
 
-            // ✅ resolve real path (symlink-safe)
+            // resolve real path (symlink-safe)
             $realDir = realpath($dir) ?: $dir;
 
             $path = $realDir . DIRECTORY_SEPARATOR . $anchor;
 
             if (file_exists($path)) {
-                // ✅ keep updating → highest wins
+                // keep updating → highest wins
                 $found = $realDir;
             }
 
