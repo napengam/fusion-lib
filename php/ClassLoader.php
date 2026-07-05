@@ -2,25 +2,46 @@
 
 /**
  * ClassLoader
- * ------------
- * Unified autoloader + router helper.
+ * -----------
+ * Unified autoloader and route helper for a PHP project.
  *
- * Generates one file: /autoload/autoload_map.php
- * Structure:
- *   [
- *     'classes' => [ className => ['file' => ..., 'mtime' => ...] ],
- *     
- *     'routes'  => [ shortClassName => filePath ]
- *   ]
- * 
- * Find project folder by walking from an "anchor" up one level.
- * The anchor must be a file or directory located exactly one level
- * below and within the project root.
+ * Responsibilities:
+ *   - Scans configured source folders for PHP files.
+ *   - Extracts fully-qualified class/interface/trait names via token parsing.
+ *   - Builds a single autoload map file: /autoload/autoload_map.php
+ *     Structure:
+ *       [
+ *         'classes' => [ FQCN => ['file' => string, 'mtime' => int] ],
+ *         'routes'  => [ shortClassName => filePath ]
+ *       ]
+ *   - Registers an autoloader that:
+ *       * Loads classes based on the generated map.
+ *       * Verifies file modification times and rebuilds the map if entries are outdated.
+ *   - Provides a simple routing helper by mapping "short" class names
+ *     (basename of the FQCN) to files located in /GUI/ or /Api/ directories.
  *
- * This avoids issues with symlinks pointing to your project, where
- * __DIR__ / realpath() may resolve to a different physical path.
+ * Project root detection
+ * ----------------------
+ * The project root is determined by walking upwards from the start directory
+ * until we find a directory that directly contains the given $anchor
+ * (file or directory name).
  *
- * 
+ * Requirements:
+ *   - $anchor must exist directly inside the project root, e.g.:
+ *         /project_root/
+ *             $anchor
+ *             src/
+ *             autoload/
+ *   - If no ancestor directory contains $anchor as an immediate child,
+ *     detection fails and an exception is thrown.
+ *
+ * This approach avoids issues with symlinked script paths by relying on
+ * a logical "anchor" artifact inside the project root.
+ *
+ * Usage:
+ *   ClassLoader::load($anchor, $paths);
+ *   - $anchor: name of a file or directory that exists inside the project root.
+ *   - $paths: array of relative source paths to scan (e.g. ['src', 'lib']).
  */
 class ClassLoader {
 
@@ -37,13 +58,13 @@ class ClassLoader {
         $baseDir = realpath($_SERVER['SCRIPT_FILENAME'] ?? getcwd());
         $basePath = self::findProjectFolder($baseDir, $anchor);
         if (!$basePath) {
-            throw new Exception("Base path containing '{$projectFolder}' not found.");
+            throw new Exception("Base path containing '{$anchor}' not found.");
         }
         $autoloadDir = $basePath . '/autoload';
         $mapFile = $autoloadDir . '/autoload_map.php';
         self::$basePath = $basePath;
         self::$paths = $paths;
-        self::$mapFile = $basePath . '/autoload/autoload_map.php';
+        self::$mapFile = $mapFile;
         if (!is_dir($autoloadDir)) {
             mkdir($autoloadDir, 0775, true);
         }
@@ -72,6 +93,7 @@ class ClassLoader {
             throw new Exception("Class '{$class}' not found or outdated.");
         });
     }
+
     /**
      * Build unified map and write to disk.
      */
@@ -155,6 +177,7 @@ class ClassLoader {
         }
         return $defs;
     }
+
     /**
      * Writes the unified autoload map file.
      */
@@ -170,7 +193,7 @@ class ClassLoader {
 
     /*
      * ***********************************************
-     * $targetDir must be a directory just one 
+     * $anchor must be a file or directory just one 
      * below project directory 
      * **********************************************
      */
