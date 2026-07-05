@@ -12,6 +12,15 @@
  *     
  *     'routes'  => [ shortClassName => filePath ]
  *   ]
+ * 
+ * Find project folder by walking from an "anchor" up one level.
+ * The anchor must be a file or directory located exactly one level
+ * below and within the project root.
+ *
+ * This avoids issues with symlinks pointing to your project, where
+ * __DIR__ / realpath() may resolve to a different physical path.
+ *
+ * 
  */
 class ClassLoader {
 
@@ -24,9 +33,9 @@ class ClassLoader {
     /**
      * Initialize the autoloader.
      */
-    public static function load(string $oneBelowProjectFolder, array $paths): void {
+    public static function load(string $anchor, array $paths): void {
         $baseDir = dirname(__DIR__);
-        $basePath = self::findBasePath($baseDir, $oneBelowProjectFolder);
+        $basePath = self::findProjectFolder($baseDir, $anchor);
 
         if (!$basePath) {
             throw new Exception("Base path containing '{$projectFolder}' not found.");
@@ -193,7 +202,7 @@ class ClassLoader {
      * **********************************************
      */
 
-    private static function findBasePath(string $startPath, string $anchorPath): string {
+    private static function findProjectFolder(string $startPath, string $anchorPath): string {
         $dir = realpath($startPath);
         if ($dir === false) {
             throw new Exception('Invalid start path');
