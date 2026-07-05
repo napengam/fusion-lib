@@ -87,6 +87,8 @@ class ClassLoader {
 
         spl_autoload_register(function ($class) use (&$classMap, $basePath, $paths, $mapFile) {
 
+            static $rebuilt = false;
+
             $entry = $classMap[$class] ?? null;
 
             if ($entry && is_file($entry['file'])) {
@@ -96,16 +98,43 @@ class ClassLoader {
                 }
             }
 
-            // rebuild only when needed
-            $map = self::buildAutoloadMap($basePath, $paths, $mapFile);
-            self::$mapCache = $map;
-            $classMap = $map['classes'];
+            if (!$rebuilt) {
+                $rebuilt = true;
 
-            $entry = $classMap[$class] ?? null;
+                $lockFile = $mapFile . '.lock';
+                $fp = fopen($lockFile, 'c');
 
-            if ($entry && is_file($entry['file'])) {
-                require_once $entry['file'];
-                return;
+                if ($fp && flock($fp, LOCK_EX)) {
+
+                    // another request may have already rebuilt → reload map first
+                    if (is_file($mapFile)) {
+                        $map = require $mapFile;
+                        self::$mapCache = $map;
+                        $classMap = $map['classes'];
+                    }
+
+                    $entry = $classMap[$class] ?? null;
+
+                    if (!$entry || !is_file($entry['file']) || filemtime($entry['file']) !== $entry['mtime']) {
+                        // still outdated → rebuild
+                        $map = self::buildAutoloadMap($basePath, $paths, $mapFile);
+                        self::$mapCache = $map;
+                        $classMap = $map['classes'];
+                    }
+
+                    flock($fp, LOCK_UN);
+                }
+
+                if ($fp) {
+                    fclose($fp);
+                }
+
+                // retry after rebuild / reload
+                $entry = $classMap[$class] ?? null;
+                if ($entry && is_file($entry['file'])) {
+                    require_once $entry['file'];
+                    return;
+                }
             }
 
             throw new Exception("Class '{$class}' not found or outdated.");
