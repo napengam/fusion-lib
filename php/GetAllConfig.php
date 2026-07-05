@@ -2,6 +2,7 @@
 
 /**
  * GetAllConfig loads and parses project configuration from INI files with:
+ * - requires the existance of config/config.ini
  * - Automatic project path resolution and caching
  * - Placeholder replacement (__DOCUMENT_ROOT__, __URL__)
  * - Runtime environment detection (CLI vs web server)
@@ -14,15 +15,11 @@ final class GetAllConfig {
 
     private static array $cache = [];
 
-    public static function load(string $project = ''): array {
-        if (empty($project)) {
-            throw new RuntimeException("Missing project directory name");
-        }
-        if (defined('PROJECT_DIR')) {
-            $project = PROJECT_DIR; // from bootstrap.php ??
-        } else {
-            $project = self::findBasePath(__DIR__, $project);
-        }
+    public static function load(): array {
+        $baseDir = realpath($_SERVER['SCRIPT_FILENAME'] ?? getcwd());
+       
+            $project = self::findProjectFolder($baseDir, 'config');
+        
         // Compute project base path
 
         $configPath = "$project/config/config.ini";
@@ -68,19 +65,23 @@ final class GetAllConfig {
      * **********************************************
      */
 
-    private static function findBasePath(string $startPath, string $anchorPath): string {
-        $dir = realpath($startPath);
-        if ($dir === false) {
-            throw new Exception('Invalid start path');
-        }
-        $anchor = basename(rtrim($anchorPath, '/\\'));
+    /*
+     * ***********************************************
+     * $anchor must be a file or directory just one 
+     * below project directory 
+     * **********************************************
+     */
+
+    private static function findProjectFolder(string $startDir, string $anchor): string {
+        $dir = $startDir;
         while ($dir !== dirname($dir)) {
             if (file_exists($dir . DIRECTORY_SEPARATOR . $anchor)) {
                 return $dir;
             }
             $dir = dirname($dir);
         }
-        throw new Exception("Anchor '{$anchor}' not found from '{$startPath}'");
+
+        throw new Exception("Project root containing '{$anchor}' not found.");
     }
 
     private static function getProjectUrl(string $project, string $basePath): string {
