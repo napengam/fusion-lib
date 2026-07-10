@@ -24,43 +24,43 @@ class ErrorHandler {
         return self::$instance;
     }
 
-    /**
-     * Handles standard PHP errors
-     */
     public function handleError(int $errno, string $errstr, string $errfile, int $errline): bool {
-        // Respect the @ suppression operator
         if (!(error_reporting() & $errno)) {
             return true;
         }
 
-        $this->reportError($errno, $errstr, $errfile, $errline);
+        $status = $this->extractStatus($errstr, 500);
+
+        $this->reportError($errno, $errstr, $errfile, $errline, $status);
         return true;
     }
 
-    /**
-     * Handles uncaught Exceptions and Throwable Errors (PHP 7+)
-     */
     public function handleException(Throwable $e): void {
+        $message = $e->getMessage();
+        $status = $this->extractStatus($message, 500);
+
         $this->reportError(
-                get_class($e),
-                $e->getMessage(),
-                $e->getFile(),
-                $e->getLine()
+            get_class($e),
+            $message,
+            $e->getFile(),
+            $e->getLine(),
+            $status
         );
     }
 
-    /**
-     * Handles Fatal errors like E_PARSE or E_COMPILE_ERROR
-     */
     public function handleShutdown(): void {
         $error = error_get_last();
 
         if ($error !== null && $this->isFatalError($error['type'])) {
+            $message = $error['message'];
+            $status = $this->extractStatus($message, 500);
+
             $this->reportError(
-                    $error['type'],
-                    $error['message'],
-                    $error['file'],
-                    $error['line']
+                $error['type'],
+                $message,
+                $error['file'],
+                $error['line'],
+                $status
             );
         }
     }
@@ -70,10 +70,16 @@ class ErrorHandler {
         return in_array($type, $fatals, true);
     }
 
-    /**
-     * The unified output method
-     */
-    private function reportError($errno, string $errstr, string $errfile, int $errline): void {
+    private function extractStatus(string &$message, int $default = 500): int {
+        if (preg_match('/^\[(\d{3})\]\s*(.*)$/', $message, $matches)) {
+            $message = $matches[2];
+            return (int)$matches[1];
+        }
+        return $default;
+    }
+
+    private function reportError($errno, string $errstr, string $errfile, int $errline, int $status = 500): void {
+
         if (class_exists('PDODB')) {
             try {
                 PDODB::rollbackAll();
@@ -81,23 +87,23 @@ class ErrorHandler {
                 error_log('Global rollback failed: ' . $e->getMessage());
             }
         }
-        // Log technical details for the admin
+
         error_log("Error [{$errno}]: {$errstr} in {$errfile} on line {$errline}");
 
-        // Clean any output currently in the buffer to prevent "dirty" JSON
         if (ob_get_length()) {
             ob_clean();
         }
 
-        // Set headers for AJAX/JSON
         if (!headers_sent()) {
-            http_response_code(500);
+            http_response_code($status);
             header('Content-Type: application/json; charset=utf-8');
         }
 
         $response = [
-            'error' => 'Fehler aufgetreten. Bitte dem Administrator mitteilen',
-            'result' => ''
+            'success' => false,
+            'error' => $status === 500
+                ? 'Fehler aufgetreten. Bitte dem Administrator mitteilen'
+                : $errstr
         ];
 
         echo json_encode($response, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_NUMERIC_CHECK);
