@@ -1,6 +1,9 @@
 <?php
 
 /*
+ * 
+  Based on my ideas refined and coded by GPT et. al using mammouth 
+ 
   REQUIRED TABLES
 
   CREATE TABLE users (
