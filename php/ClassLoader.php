@@ -147,7 +147,15 @@ class ClassLoader {
     private static function buildAutoloadMap(string $basePath, array $paths, string $mapFile): array {
         $classes = [];
         $routes = [];
-        foreach ($paths as $path) {
+        $cpaths = $paths;
+        $guiRoutes = [];
+        if (self::isMultiDimensional($paths)) {
+            $cpaths = $paths['classes'];
+            $guiRoutes = $paths['routes'];
+        }
+
+
+        foreach ($cpaths as $path) {
             $rii = new RecursiveIteratorIterator(
                     new RecursiveDirectoryIterator("$basePath/$path", FilesystemIterator::SKIP_DOTS)
             );
@@ -164,7 +172,10 @@ class ClassLoader {
                     ];
                     // Router: store naked class name as key
                     $short = basename(str_replace('\\', '/', $def));
-                    if (strpos($filePath, '/GUI/') !== false || strpos($filePath, '/Api/') !== false) {
+                    $found = array_filter($guiRoutes, function ($p) use ($filePath){
+                        return strpos($filePath, $p) !== false;
+                    });
+                    if ($found) {
                         $routes[$short] = $filePath;
                     }
                 }
@@ -178,6 +189,15 @@ class ClassLoader {
         ];
         self::writeMapFile($mapFile, $data);
         return $data;
+    }
+
+    private static function isMultiDimensional(array $array): bool {
+        foreach ($array as $value) {
+            if (is_array($value)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -229,13 +249,24 @@ class ClassLoader {
      * Writes the unified autoload map file.
      */
     private static function writeMapFile(string $file, array $data): void {
-        file_put_contents(
-                $file,
-                "<?php\n\n" .
+        $tmpFile = $file . '.tmp';
+
+        $content = "<?php\n\n" .
                 "// Auto-generated combined autoload map. Do not edit manually.\n" .
                 "// Generated on: " . date('Y-m-d H:i:s') . "\n\n" .
-                "return " . var_export($data, true) . ";\n"
-        );
+                "return " . var_export($data, true) . ";\n";
+
+        // ensure directory exists
+        $dir = dirname($file);
+        if (!is_dir($dir)) {
+            mkdir($dir, 0775, true);
+    }
+
+        // write complete file first
+        file_put_contents($tmpFile, $content, LOCK_EX);
+
+        // atomic swap
+        rename($tmpFile, $file);
     }
 
     /*
