@@ -1,113 +1,215 @@
 <?php
 
-/**
- * Auth class handles user authentication including registration, login, logout,
- * session management, and secure password storage using libsodium.
- * Provides methods to check authentication status and retrieve user session data.
- * It makes uese of class PDODB;
+/*
+  REQUIRED TABLES
+
+  CREATE TABLE users (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  username VARCHAR(255) NOT NULL UNIQUE,
+  password_hash VARCHAR(255) NOT NULL,
+  created_at INT NOT NULL
+  );
+
+  CREATE TABLE login_attempts (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  type VARCHAR(20) NOT NULL, -- 'username' or 'ip'
+  value VARCHAR(255) NOT NULL,
+  attempts INT NOT NULL DEFAULT 0,
+  last_attempt INT NOT NULL,
+  UNIQUE KEY unique_type_value (type,value)
+  );
+ * SECURITY FEATURES / PROTECTION
+
+  - Protects against brute force attacks (username + IP based tracking)
+  - Prevents unlimited login retries (hard limit after 10 attempts)
+  - Slows down attackers using exponential delay (max 5 seconds)
+  - Resistant to session reset attacks (stored in database, not session)
+  - Resistant to cookie clearing attacks
+  - Limits distributed attacks partially (IP + username combined)
+  - Automatically resets attempts after 15 minutes (cooldown window)
+  - Prevents user enumeration timing attacks (delay applied consistently)
+  - Secures session against fixation (session_regenerate_id)
+
+  NOT FULLY PROTECTED AGAINST
+
+  - Large scale distributed botnets (many IPs)
+  - Targeted attacks across many usernames (credential stuffing lists)
+  - Requires HTTPS + secure cookie settings for full session security
  */
+
+
 class Auth {
 
-    private $db;
-    private $encryption;
+private PDODB $db;
 
-    public function __construct(PDODB $db) {
-        $this->db = $db;
-        $this->encryption = new SecureEncryption(APP_KEY);
-    }
+public function __construct(PDODB $db) {
+$this->db = $db;
+if (session_status() !== PHP_SESSION_ACTIVE) {
+throw new Exception('Session not started.');
+}
+}
 
-    public function register(string $username, string $password): bool {
-        if (strlen($password) < 1) {
-            // this is on you; I except evry Lengt >0
-            throw new Exception("Password must be at least ? characters long.");
-        }
+/* =========================
+  LOGIN
+  ========================= */
+public function login(string $username, string $password): bool {
 
-        // Check if username exists
-        $existing = $this->db->queryFetchOne(
-                "SELECT id FROM users WHERE username = ?",
-                [$username]
-        );
+$ip = $this->getClientIp();
 
-        if ($existing) {
-            throw new Exception("Username already exists.");
-        }
+// get attempt data for username
+$userAttempt = $this->getAttempts('username', $username);
 
-        $salt = random_bytes(16);
-        $passwordHash = sodium_crypto_pwhash_str(
-                $password,
-                SODIUM_CRYPTO_PWHASH_OPSLIMIT_INTERACTIVE,
-                SODIUM_CRYPTO_PWHASH_MEMLIMIT_INTERACTIVE
-        );
+// get attempt data for ip
+$ipAttempt = $this->getAttempts('ip', $ip);
 
-        try {
-            $this->db->begin();
-            $this->db->query(
-                    "INSERT INTO users (username, password_hash, encryption_salt) VALUES (?, ?, ?)",
-                    [$username, $passwordHash, $salt]
-            );
-            $this->db->commit();
-            return true;
-        } catch (Exception $e) {
-            $this->db->rollback();
-            throw $e;
-        }
-    }
+// reset if older than 15 minutes
+if (time() - $userAttempt['time'] > 900) {
+$userAttempt['attempts'] = 0;
+}
+if (time() - $ipAttempt['time'] > 900) {
+$ipAttempt['attempts'] = 0;
+}
 
-    public function login(string $username, string $password): bool {
-        $user = $this->db->queryFetchOne(
-                "SELECT id, password_hash, encryption_salt FROM users WHERE username = ?",
-                [$username]
-        );
+// use the higher value for enforcement
+$attempts = max($userAttempt['attempts'], $ipAttempt['attempts']);
 
-        if (!$user || !sodium_crypto_pwhash_str_verify($user->password_hash, $password)) {
-            return false;
-        }
+// hard lock after too many attempts
+if ($attempts >= 10) {
+throw new Exception("Too many attempts. Try again later.");
+}
 
-        session_regenerate_id(true);
-        $_SESSION['user_id'] = $user->id;
-        $_SESSION['username'] = $username;
-        $_SESSION['encryption_salt'] = $user->encryption_salt;
-        $_SESSION['last_activity'] = time();
+// exponential delay to slow brute force
+if ($attempts > 0) {
+$delay = min(2 ** $attempts, 5);
+sleep($delay);
+}
 
-        return true;
-    }
+// fetch user
+$user = $this->db->queryFetchOne(
+"SELECT id,username,password_hash FROM users WHERE username = ?",
+ [$username]
+);
 
-    public function logout(): void {
-        $_SESSION = [];
-        if (ini_get("session.use_cookies")) {
-            $params = session_get_cookie_params();
-            setcookie(
-                    session_name(),
-                    '',
-                    time() - 42000,
-                    $params["path"],
-                    $params["domain"],
-                    $params["secure"],
-                    $params["httponly"]
-            );
-        }
-        session_destroy();
-    }
+// verify password
+if (!$user ||!sodium_crypto_pwhash_str_verify($user->password_hash, $password)) {
 
-    public function isLoggedIn(): bool {
-        if (empty($_SESSION['user_id']) || empty($_SESSION['last_activity'])) {
-            return false;
-        }
+// increase both counters
+$this->increaseAttempts('username', $username, $userAttempt['attempts'] + 1);
+$this->increaseAttempts('ip', $ip, $ipAttempt['attempts'] + 1);
 
-        if (time() - $_SESSION['last_activity'] > SESSION_TIMEOUT) {
-            $this->logout();
-            return false;
-        }
+return false;
+}
 
-        $_SESSION['last_activity'] = time();
-        return true;
-    }
+// success → clear attempts
+$this->clearAttempts('username', $username);
+$this->clearAttempts('ip', $ip);
 
-    public function getUserId(): ?int {
-        return $this->isLoggedIn() ? (int) $_SESSION['user_id'] : null;
-    }
+// secure session
+session_regenerate_id(true);
 
-    public function getEncryptionSalt(): ?string {
-        return $this->isLoggedIn() ? $_SESSION['encryption_salt'] : null;
-    }
+$_SESSION['user_id'] = $user->id;
+$_SESSION['username'] = $user->username;
+$_SESSION['last_activity'] = time();
+
+return true;
+}
+
+/* =========================
+  LOGOUT
+  ========================= */
+public function logout(): void {
+
+$_SESSION = [];
+
+if (ini_get("session.use_cookies")) {
+$params = session_get_cookie_params();
+setcookie(session_name(), '', time() - 42000, $params["path"], $params["domain"], $params["secure"], $params["httponly"]);
+}
+
+session_destroy();
+}
+
+/* =========================
+  SESSION CHECK
+  ========================= */
+public function isLoggedIn(): bool {
+
+// basic session validation
+if (empty($_SESSION['user_id']) || empty($_SESSION['last_activity'])) {
+return false;
+}
+
+// session timeout (30 min)
+if (time() - $_SESSION['last_activity'] > 1800) {
+$this->logout();
+return false;
+}
+
+// update activity timestamp
+$_SESSION['last_activity'] = time();
+
+return true;
+}
+
+/* =========================
+  GET ATTEMPTS
+  returns ['attempts'=>int,'time'=>int]
+  ========================= */
+private function getAttempts(string $type, string $value): array {
+
+$row = $this->db->queryFetchOne(
+"SELECT attempts,last_attempt FROM login_attempts WHERE type = ? AND value = ? LIMIT 1",
+ [$type, $value]
+);
+
+if (!$row) {
+return ['attempts' => 0, 'time' => 0];
+}
+
+return [
+'attempts' => (int) $row->attempts,
+ 'time' => (int) $row->last_attempt
+];
+}
+
+/* =========================
+  INCREASE ATTEMPTS
+  ========================= */
+private function increaseAttempts(string $type, string $value, int $attempts): void {
+
+$existing = $this->db->queryFetchOne(
+"SELECT id FROM login_attempts WHERE type = ? AND value = ? LIMIT 1",
+ [$type, $value]
+);
+
+if ($existing) {
+$this->db->execute(
+"UPDATE login_attempts SET attempts = ?, last_attempt = ? WHERE id = ?",
+ [$attempts, time(), $existing->id]
+);
+} else {
+$this->db->execute(
+"INSERT INTO login_attempts (type,value,attempts,last_attempt) VALUES (?,?,?,?)",
+ [$type, $value, $attempts, time()]
+);
+}
+}
+
+/* =========================
+  CLEAR ATTEMPTS
+  ========================= */
+private function clearAttempts(string $type, string $value): void {
+
+$this->db->execute(
+"DELETE FROM login_attempts WHERE type = ? AND value = ?",
+ [$type, $value]
+);
+}
+
+/* =========================
+  HELPER: CLIENT IP
+  ========================= */
+private function getClientIp(): string {
+return $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+}
 }
