@@ -3,12 +3,9 @@
 class Auth {
 
     private PDODB $db;
-
     public function __construct(PDODB $db) {
         $this->db = $db;
-
     }
-
     /* =========================
       LOGIN
       ========================= */
