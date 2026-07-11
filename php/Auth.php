@@ -2,8 +2,8 @@
 
 /*
  * 
-  Based on my ideas refined and coded by GPT et. al using mammouth 
- 
+  Based on my ideas refined and coded by GPT et. al using mammouth
+
   REQUIRED TABLES
 
   CREATE TABLE users (
@@ -11,7 +11,9 @@
   username VARCHAR(255) NOT NULL UNIQUE,
   password VARCHAR(255) NOT NULL,
   created INT NOT NULL,
-  <any other fields you need>
+  email varchar(128),
+  role char(10),
+  homeurl varchar(255)
   );
 
   CREATE TABLE login_attempts (
@@ -59,62 +61,36 @@ class Auth {
     public function login(string $username, string $password): bool {
 
         $ip = $this->getClientIp();
-
-// get attempt data for username
         $userAttempt = $this->getAttempts('username', $username);
-
-// get attempt data for ip
         $ipAttempt = $this->getAttempts('ip', $ip);
-
-// reset if older than 15 minutes
         if (time() - $userAttempt['time'] > 900) {
             $userAttempt['attempts'] = 0;
         }
         if (time() - $ipAttempt['time'] > 900) {
             $ipAttempt['attempts'] = 0;
         }
-
-// use the higher value for enforcement
         $attempts = max($userAttempt['attempts'], $ipAttempt['attempts']);
-
-// hard lock after too many attempts
         if ($attempts >= 10) {
-            return $this->result(fasle, "Too many attempts. Try again later.");
+            return $this->result(false, "Too many attempts. Try again later.");
         }
-
-// exponential delay to slow brute force
         if ($attempts > 0) {
             $delay = min(2 ** $attempts, 5);
             sleep($delay);
         }
-
-// fetch user
         $user = $this->db->queryFetchOne(
                 "SELECT * FROM users WHERE username = ?",
                 [$username]
         );
-
-// verify password
         if (!$user || !sodium_crypto_pwhash_str_verify($user->password, $password)) {
-
-// increase both counters
             $this->increaseAttempts('username', $username, $userAttempt['attempts'] + 1);
             $this->increaseAttempts('ip', $ip, $ipAttempt['attempts'] + 1);
             return $this->result(false, 'invalid_credentials');
         }
-
-// success → clear attempts
         $this->clearAttempts('username', $username);
         $this->clearAttempts('ip', $ip);
 
-// secure session
-        session_regenerate_id(true);
-
-        $_SESSION['user_id'] = $user->id;
-        $_SESSION['username'] = $user->username;
-        $_SESSION['last_activity'] = time();
-        return $this->result(true,$user);
-        
+        unset($user->password);
+        return $this->result(true, $user);
     }
 
     /* =========================
@@ -134,25 +110,72 @@ class Auth {
     }
 
     /* =========================
+      REGISTER
+      ========================= */
+
+    public function register(string $username, string $password, string $email): array {
+
+        $username = trim($username);
+        if ($username === '' || $password === '') {
+            return $this->result(false, 'empty_fields');
+        }
+        if (strlen($username) < 3 || strlen($username) > 50) {
+            return $this->result(false, 'invalid_username_length');
+        }
+        if (strlen($password) < 6) {
+            return $this->result(false, 'password_too_short');
+        }
+        // check if user exists
+        $existing = $this->db->queryFetchOne(
+                "SELECT id FROM users WHERE username = ? LIMIT 1",
+                [$username]
+        );
+        if ($existing) {
+            // fake hash to equalize timing
+            sodium_crypto_pwhash_str(
+                    $password,
+                    SODIUM_CRYPTO_PWHASH_OPSLIMIT_INTERACTIVE,
+                    SODIUM_CRYPTO_PWHASH_MEMLIMIT_INTERACTIVE
+            );
+            return $this->result(false, 'user_exists');
+        }
+        $hash = sodium_crypto_pwhash_str(
+                $password,
+                SODIUM_CRYPTO_PWHASH_OPSLIMIT_INTERACTIVE,
+                SODIUM_CRYPTO_PWHASH_MEMLIMIT_INTERACTIVE
+        );
+
+        // insert user
+        $ok = $this->db->execute(
+                "INSERT INTO users (username, password,email, created) VALUES (?, ?, ?, ?)",
+                [$username, $hash, $email, time()]
+        );
+        if (!$ok) {
+            return $this->result(false, 'registration_failed');
+        }
+        // fetch created user
+        $userId = $this->db->lastInsertId();
+        $user = $this->db->queryFetchOne(
+                "SELECT * FROM users WHERE id = ? LIMIT 1",
+                [$userId]
+        );
+        unset($user->password);
+        return $this->result(true, $user);
+    }
+
+    /* =========================
       SESSION CHECK
       ========================= */
 
     public function isLoggedIn(): bool {
-
-// basic session validation
         if (empty($_SESSION['user_id']) || empty($_SESSION['last_activity'])) {
             return false;
         }
-
-// session timeout (30 min)
         if (time() - $_SESSION['last_activity'] > 1800) {
             $this->logout();
             return false;
         }
-
-// update activity timestamp
         $_SESSION['last_activity'] = time();
-
         return true;
     }
 
