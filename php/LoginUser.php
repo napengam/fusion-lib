@@ -34,11 +34,11 @@
  */
 class LoginUser {
 
-    private PDO $db;
+    private PDODB $db;
     private array $authConfig;
     private int $sessionTimeout; // inactivity limit in seconds
 
-    public function __construct(PDO $pdo) {
+    public function __construct(PDODB $pdo) {
         $this->db = $pdo;
         // Allow public (unauthenticated) routes
         if ($this->allowPublicRoutes([
@@ -46,9 +46,9 @@ class LoginUser {
                 ])) {
             return;
         }
+        $this->sessionTimeout = 500;
         $this->secureSessionInit();
         $this->enforceSessionTimeout();
-        $this->login();
     }
 
     /* ---------------- PUBLIC ROUTE CHECK ---------------- */
@@ -75,6 +75,9 @@ class LoginUser {
 
             session_start();
         }
+        if (empty($_SESSION['csrf_token'])) {
+            $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+        }
     }
 
     /* ---------------- SESSION TIMEOUT ---------------- */
@@ -93,44 +96,39 @@ class LoginUser {
 
     /* ---------------- LOGIN FLOW ---------------- */
 
-    private function login(): array {
-        global $logged_in;
+    public function login($username, $password): array {
 
+        global $logged_in;
+        $this->verifyCsrf();
+        $this->logout();
+        session_start();
         if (!empty($_SESSION['user_id'])) {
             $logged_in = true;
             return ["success" => true, 'reason' => 'logged'];
         }
+        $auth = new Auth($this->db);
 
-        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-
-            $this->verifyCsrf();
-
-            $username = trim($_POST['username'] ?? '');
-            $password = $_POST['password'] ?? '';
-
-            $auth = new Auth($this->db);
-            $result = $auth->login($username, $password);
-            if (!$result['success']) {
-                return $result;
-            }
-
-            session_regenerate_id(true);
-            $user = $result['reason'];
-            $_SESSION['user_id'] = $user->id;
-            $_SESSION['username'] = $username;
-            $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-            $_SESSION['last_activity'] = time();
-            $_SESSION['email'] = $user->email;
-            $_SESSION['role'] = $user->role;
-            $_SESSION['home'] = $user->home;
-
-            if (!empty($this->authConfig['role_field'])) {
-                $_SESSION['role'] = $this->getRole($username);
-            }
-
-            $logged_in = true;
+        $result = $auth->login($username, $password);
+        if (!$result['success']) {
             return $result;
         }
+
+        session_regenerate_id(true);
+        $user = $result['reason'];
+        $_SESSION['user_id'] = $user->id;
+        $_SESSION['username'] = $username;
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+        $_SESSION['last_activity'] = time();
+        $_SESSION['email'] = $user->email;
+        $_SESSION['role'] = $user->role;
+        $_SESSION['home'] = $user->home;
+
+        if (!empty($this->authConfig['role_field'])) {
+            $_SESSION['role'] = $this->getRole($username);
+        }
+
+        $logged_in = true;
+        return $result;
     }
 
     public static function logout(): void {
@@ -156,15 +154,36 @@ class LoginUser {
             session_destroy();
         }
         // Optionally redirect to login or home
-        header('Location: /login.php');
-        exit;
+    }
+
+    public function register($user, $passwd, $email) {
+        $auth = new Auth($this->db);
+        $result = $auth->register($user, $passwd, $email);
+        return $result;
+    }
+
+    /* =========================
+      SESSION CHECK
+      ========================= */
+
+    public function isLoggedIn(): bool {
+        if (empty($_SESSION['user_id']) || empty($_SESSION['last_activity'])) {
+            return false;
+        }
+        if (time() - $_SESSION['last_activity'] > 1800) {
+            $this->logout();
+            return false;
+        }
+        $_SESSION['last_activity'] = time();
+
+        return true;
     }
 
     /* ---------------- CSRF ---------------- */
 
     private function verifyCsrf(): void {
         if (
-                empty($_POST['csrf']) || empty($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $_POST['csrf'])
+                empty($_POST['csrf_token']) || empty($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])
         ) {
             http_response_code(403);
             exit('Invalid CSRF token');
