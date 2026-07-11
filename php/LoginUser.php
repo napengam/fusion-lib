@@ -107,7 +107,7 @@ class LoginUser {
 
             $username = trim($_POST['username'] ?? '');
             $password = $_POST['password'] ?? '';
-            
+
             $auth = new Auth($this->db);
             $result = $auth->login($username, $password);
             if (!$result['success']) {
@@ -115,12 +115,14 @@ class LoginUser {
             }
 
             session_regenerate_id(true);
-
             $user = $result['reason'];
             $_SESSION['user_id'] = $user->id;
             $_SESSION['username'] = $username;
             $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
             $_SESSION['last_activity'] = time();
+            $_SESSION['email'] = $user->email;
+            $_SESSION['role'] = $user->role;
+            $_SESSION['home'] = $user->home;
 
             if (!empty($this->authConfig['role_field'])) {
                 $_SESSION['role'] = $this->getRole($username);
