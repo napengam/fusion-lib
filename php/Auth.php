@@ -9,8 +9,9 @@
   CREATE TABLE users (
   id INT AUTO_INCREMENT PRIMARY KEY,
   username VARCHAR(255) NOT NULL UNIQUE,
-  password_hash VARCHAR(255) NOT NULL,
-  created_at INT NOT NULL
+  password VARCHAR(255) NOT NULL,
+  created INT NOT NULL,
+  <any other fields you need>
   );
 
   CREATE TABLE login_attempts (
@@ -89,12 +90,12 @@ class Auth {
 
 // fetch user
         $user = $this->db->queryFetchOne(
-                "SELECT id,username,password_hash FROM users WHERE username = ?",
+                "SELECT * FROM users WHERE username = ?",
                 [$username]
         );
 
 // verify password
-        if (!$user || !sodium_crypto_pwhash_str_verify($user->password_hash, $password)) {
+        if (!$user || !sodium_crypto_pwhash_str_verify($user->password, $password)) {
 
 // increase both counters
             $this->increaseAttempts('username', $username, $userAttempt['attempts'] + 1);
@@ -112,7 +113,7 @@ class Auth {
         $_SESSION['user_id'] = $user->id;
         $_SESSION['username'] = $user->username;
         $_SESSION['last_activity'] = time();
-        return $this->result(true);
+        return $this->result(true,$user);
         
     }
 
@@ -221,7 +222,7 @@ class Auth {
         return $_SERVER['REMOTE_ADDR'] ?? 'unknown';
     }
 
-    private function result(bool $success = false, string $reason = ''): array {
+    private function result(bool $success = false, mixed $reason = ''): array {
         return [
             'success' => $success,
             'reason' => $reason
