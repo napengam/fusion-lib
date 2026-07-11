@@ -1,11 +1,34 @@
 <?php
 
+/**
+ * Auth
+ *
+ * Provides authentication primitives for user login and registration.
+ *
+ * Responsibilities:
+ * - Verify credentials using libsodium password hashing
+ * - Register new users with validated input
+ * - Enforce rate limiting on login attempts (IP + username)
+ *
+ * Security:
+ * - Implements exponential backoff and temporary lockout (15 min window)
+ * - Mitigates timing attacks during registration
+ * - Never exposes password hashes outside this class
+ *
+ * Notes:
+ * - Stateless: does NOT manage sessions or cookies
+ * - No authorization logic (roles/permissions handled elsewhere)
+ * - Intended to be used by a higher-level auth/session layer (e.g. LoginUser)
+ * - Not designed to withstand large-scale distributed attacks without additional controls
+ */
 class Auth {
 
     private PDODB $db;
+
     public function __construct(PDODB $db) {
         $this->db = $db;
     }
+
     /* =========================
       LOGIN
       ========================= */
@@ -47,13 +70,12 @@ class Auth {
 
         $this->clearAttempts('username', $username);
         $this->clearAttempts('ip', $ip);
-        
+
         unset($user->password);
 
         return $this->result(true, $user);
     }
 
-   
     /* =========================
       REGISTER
       ========================= */
@@ -111,8 +133,6 @@ class Auth {
 
         return $this->result(true, $user);
     }
-
-    
 
     /* =========================
       ATTEMPTS
