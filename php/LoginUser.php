@@ -1,15 +1,36 @@
 <?php
 
 /**
- * LoginUser class provides comprehensive authentication functionality including:
- * - Secure session management with timeout enforcement
- * - Login/logout flows with CSRF protection
- * - Password verification with legacy MD5 migration support
- * - Role-based permission checking
- * - Secure session initialization and hardening
- * - Configurable authentication table/field mappings
- * - Automatic password hash upgrading
- * - Public route whitelisting
+ * LoginUser handles session-based authentication flow and access control.
+ *
+ * Responsibilities:
+ * - Initializes and hardens PHP sessions (secure cookies, HttpOnly, SameSite)
+ * - Enforces session inactivity timeout with automatic logout
+ * - Processes login requests using the Auth class for credential verification
+ * - Regenerates session IDs on login to prevent session fixation
+ * - Stores authenticated user data securely in the session
+ * - Protects POST requests with CSRF token validation
+ * - Supports public route whitelisting (no authentication required)
+ * - Provides secure logout with full session destruction
+ *
+ * Notes:
+ * - This class is designed for server-rendered or form-based login flows
+ * - It expects credentials via POST (username/password)
+ * - Auth class is responsible for actual password verification and user lookup
+ * - Session state is the single source of truth for authentication
+ *
+ * Security Features:
+ * - Session fixation protection via session_regenerate_id()
+ * - Secure cookie flags (Secure, HttpOnly, SameSite=Strict)
+ * - CSRF protection for login requests
+ * - Automatic session expiration based on inactivity
+ *
+ * Typical Flow:
+ * 1. Constructor initializes session and checks public routes
+ * 2. Session timeout is enforced
+ * 3. If POST request → credentials are validated via Auth
+ * 4. On success → session is populated and user is authenticated
+ * 5. On inactivity timeout → session is destroyed and user is logged out
  */
 class LoginUser {
 
@@ -106,6 +127,7 @@ class LoginUser {
             }
 
             $logged_in = true;
+            return $result;
         }
     }
 
