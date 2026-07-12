@@ -1,15 +1,44 @@
 <?php
-
 /**
- * MoneyValidator handles locale-aware currency validation, parsing, and formatting.
- * Features include:
- * - Locale-specific currency validation and parsing (supports multiple currencies)
- * - Automatic detection of decimal/thousands separators and currency symbol position
- * - Currency formatting with or without symbol
- * - Detailed parsing that returns both value and currency code
- * - Caching of NumberFormatter instances for performance
- * - Normalization of number strings from various formats
- * - Configurable locale support (defaults to 'de_DE')
+ * Class MoneyValidator
+ *
+ * WHAT:
+ * Utility class for validating, parsing, and formatting monetary values
+ * in a locale-aware and currency-safe way.
+ *
+ * Provides:
+ * - Validation of currency strings and plain numeric inputs
+ * - Parsing of formatted money values into float
+ * - Formatting of floats into locale-specific currency strings
+ * - Extraction of currency metadata (symbol, separators, position)
+ * - Detailed parsing with currency code detection
+ *
+ * HOW:
+ * - Uses PHP's NumberFormatter (Intl) for reliable locale-aware handling
+ * - Detects decimal and thousands separators dynamically per locale
+ * - Parses currency strings using parseCurrency()
+ * - Falls back to normalized numeric parsing when no symbol is present
+ * - Normalizes input by stripping invalid characters and unifying separators
+ * - Caches NumberFormatter instances per locale for performance
+ *
+ * DESIGN:
+ * - Locale-driven behavior (default: de_DE)
+ * - Accepts flexible user input (e.g. "1.234,56 €", "1234.56", "€1,234.56")
+ * - Safe parsing: returns null for invalid values instead of throwing
+ * - Lightweight and reusable across CLI, APIs, and UI layers
+ * - Keeps formatting and parsing consistent via a single formatter instance
+ *
+ * NOTES:
+ * - Default currency is derived from locale (fallback: EUR)
+ * - Decimal separator is normalized internally to "."
+ * - Currency symbol position (prefix/suffix) is auto-detected
+ * - NumberFormatter must be available (Intl extension required)
+ *
+ * USE CASES:
+ * - Form validation for prices and amounts
+ * - Converting user input into database-safe float values
+ * - Displaying localized currency values in UI
+ * - Handling multi-locale financial data
  */
 declare(strict_types=1);
 
