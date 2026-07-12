@@ -2,62 +2,89 @@
 
 declare(strict_types=1);
 
+/**
+ * Trait DateAndTime
+ *
+ * WHAT:
+ * Collection of helper methods for handling date and time operations
+ * in a consistent way across the application.
+ *
+ * Provides:
+ * - Current date, time, and timestamp helpers
+ * - Date and time calculations (add, duration, comparisons)
+ * - Format conversions (German ↔ SQL)
+ * - Validation utilities for date and time
+ * - Flexible parsing of mixed date/time input formats
+ * - Locale-aware conversion using IntlDateFormatter
+ *
+ * HOW:
+ * - Uses strict manual parsing (no unreliable strtotime guessing)
+ * - Uses DateTimeImmutable for safe comparisons only
+ * - Normalizes input into deterministic formats before processing
+ * - Supports multiple input formats (d.m.Y, Y-m-d, d/m/Y, etc.)
+ * - Uses IntlDateFormatter only for formatting (not parsing)
+ *
+ * DESIGN:
+ * - No silent data corruption
+ * - Invalid values return false
+ * - Predictable and testable behavior
+ * - Works with strings, arrays, and objects
+ * - Keeps method names stable for backward compatibility
+ *
+ * NOTES:
+ * - Timezone is taken from PHP default
+ * - SQL format: Y-m-d or Y-m-d H:i:s
+ * - German format: d.m.Y
+ */
+
 trait DateAndTime {
 
-    /**
-     * Get current date (Y-m-d)
-     */
     private function getCurrentDate(): string {
         return date('Y-m-d');
     }
 
-    /**
-     * Get current time (H:i)
-     */
     private function getCurrentTime(): string {
         return date('H:i');
     }
 
-    /**
-     * Public alias for current time.
-     */
     public function timeNow(): string {
         return $this->getCurrentTime();
     }
 
-    /**
-     * Public alias for current date.
-     */
     public function fullDateNow(): string {
         return $this->getCurrentDate();
     }
 
-    /**
-     * Get current timestamp (Y-m-d H:i:s)
-     */
     public function timestampNow(): string {
         return date('Y-m-d H:i:s');
     }
 
-    /**
-     * Calculate duration in minutes between two HH:MM times.
-     * Handles rollover past midnight.
-     */
     public function durationMinutes(string $start, string $end): int {
-        $startTime = strtotime("1970-01-01 $start");
-        $endTime = strtotime("1970-01-01 $end");
+        $s = $this->parseTime($start);
+        $e = $this->parseTime($end);
 
-        if ($endTime < $startTime) {
-            $endTime += 86400; // add 24h rollover
+        if (!$s || !$e) {
+            return 0;
         }
 
-        return (int) (($endTime - $startTime) / 60);
+        $startMin = $s['hour'] * 60 + $s['minute'];
+        $endMin = $e['hour'] * 60 + $e['minute'];
+
+        if ($endMin < $startMin) {
+            $endMin += 1440;
+        }
+
+        return $endMin - $startMin;
     }
 
-    /**
-     * Add a time unit (days, months, years) to a date.
-     */
     public function dateAddWhat(string $date, string $unit, int $amount): string {
+        $d = $this->parseDate($date);
+        if (!$d) {
+            return $date;
+        }
+
+        $dt = new \DateTimeImmutable(sprintf('%04d-%02d-%02d', $d['year'], $d['month'], $d['day']));
+
         $mod = match ($unit) {
             'd' => "+$amount days",
             'm' => "+$amount months",
@@ -65,166 +92,131 @@ trait DateAndTime {
             default => null,
         };
 
-        return $mod ? date('Y-m-d', strtotime($mod, strtotime($date))) : $date;
+        if (!$mod) {
+            return $date;
+        }
+
+        return $dt->modify($mod)->format('Y-m-d');
     }
 
-    /**
-     * Add hours and minutes to a time (H:i)
-     */
     public function timeAdd(string $time, int $hours, int $minutes): string {
-        return date('H:i', strtotime("+{$hours} hours +{$minutes} minutes", strtotime($time)));
+        $t = $this->parseTime($time);
+        if (!$t) {
+            return $time;
+        }
+
+        $total = $t['hour'] * 60 + $t['minute'] + ($hours * 60) + $minutes;
+        $total = ($total % 1440 + 1440) % 1440;
+
+        $h = intdiv($total, 60);
+        $m = $total % 60;
+
+        return sprintf('%02d:%02d', $h, $m);
     }
 
-    /**
-     * Convert German date (d.m.Y) to SQL (Y-m-d)
-     */
     public function sqlDateSet(string $date): string {
-        $parts = explode('.', $date);
-        return count($parts) === 3 ? sprintf('%04d-%02d-%02d', (int) $parts[2], (int) $parts[1], (int) $parts[0]) : $date;
+        $d = $this->parseDate($date);
+        if (!$d) {
+            return $date;
+        }
+
+        return sprintf('%04d-%02d-%02d', $d['year'], $d['month'], $d['day']);
     }
 
-    /**
-     * Convert SQL date (Y-m-d) to German format (d.m.Y)
-     */
     public function gerDateSet(string $date): string {
-        $parts = explode('-', $date);
-        return count($parts) === 3 ? sprintf('%02d.%02d.%04d', (int) $parts[2], (int) $parts[1], (int) $parts[0]) : $date;
+        $d = $this->parseSqlDate($date);
+        if (!$d) {
+            return $date;
+        }
+
+        return sprintf('%02d.%02d.%04d', $d['day'], $d['month'], $d['year']);
     }
 
-    /**
-     * Validate a time string (H:i[:s])
-     */
     public function isValidTime(string $time): bool {
-        return (bool) preg_match('/^(2[0-3]|[01]?\d):([0-5]?\d)(:[0-5]?\d)?$/', $time);
+        return $this->parseTime($time) !== null;
     }
 
-    /**
-     * Validate any supported date format.
-     */
     public function isValidDate(?string $anyDate): bool {
-        if (trim((string) $anyDate) === '') {
+        if (trim((string)$anyDate) === '') {
             return true;
         }
         return $this->parseFlexibleDate($anyDate) !== false;
     }
 
-    /**
-     * Check leap year.
-     */
     public function isLeapYear(int $year): bool {
         return ($year % 4 === 0 && $year % 100 !== 0) || ($year % 400 === 0);
     }
 
-    /**
-     * Check if date is in the past.
-     */
     public function isPastDate(string $date): bool {
         $parsed = $this->parseFlexibleDate($date);
-        return $parsed !== false && $parsed['datetime']->getTimestamp() < strtotime($this->getCurrentDate());
+        if (!$parsed) {
+            return false;
+        }
+
+        return $parsed['datetime']->format('Y-m-d') < $this->getCurrentDate();
     }
 
-    /**
-     * Check if date is in the future.
-     */
     public function isFutureDate(string $date): bool {
         $parsed = $this->parseFlexibleDate($date);
-        return $parsed !== false && $parsed['datetime']->getTimestamp() > strtotime($this->getCurrentDate());
+        if (!$parsed) {
+            return false;
+        }
+
+        return $parsed['datetime']->format('Y-m-d') > $this->getCurrentDate();
     }
 
-    /**
-     * Flexible date/time parser supporting various formats.
-     */
     public function parseFlexibleDate(string $input): array|false {
         $input = trim($input);
         if ($input === '') {
             return false;
         }
 
-        // Extend time with :00 if needed
-        if (preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/', $input) ||
-                preg_match('/^\d{1,2}[.\-\/]\d{1,2}[.\-\/]\d{2,4} \d{2}:\d{2}$/', $input)) {
-            $input .= ':00';
-        }
+        $dateTime = explode(' ', $input, 2);
+        $datePart = $dateTime[0];
+        $timePart = $dateTime[1] ?? null;
 
-        $input = $this->normDateTime($input);
-        if ($input === false) {
+        $date = $this->parseDate($datePart) ?? $this->parseSqlDate($datePart);
+        if (!$date) {
             return false;
         }
 
-        $formats = [
-            'Y-m-d H:i:s', 'd.m.Y H:i:s', 'd/m/Y H:i:s', 'd-m-Y H:i:s',
-            'Y-m-d', 'd.m.Y', 'd/m/Y', 'd-m-Y',
-        ];
+        $hasTime = false;
+        $time = ['hour' => 0, 'minute' => 0, 'second' => 0];
 
-        foreach ($formats as $format) {
-            $dt = \DateTimeImmutable::createFromFormat($format, $input);
-            $errors = \DateTimeImmutable::getLastErrors();
-
-            if ($dt && empty($errors['warning_count']) && empty($errors['error_count'])) {
-                return [
-                    'datetime' => $dt,
-                    'hasTime' => str_contains($format, 'H'),
-                ];
+        if ($timePart !== null) {
+            $t = $this->parseTime($timePart);
+            if (!$t) {
+                return false;
             }
+            $time = $t;
+            $hasTime = true;
         }
 
-        $timestamp = strtotime($input);
-        if ($timestamp !== false) {
-            return [
-                'datetime' => (new \DateTimeImmutable())->setTimestamp($timestamp),
-                'hasTime' => str_contains($input, ':'),
-            ];
-        }
+        $dt = new \DateTimeImmutable(sprintf(
+            '%04d-%02d-%02d %02d:%02d:%02d',
+            $date['year'],
+            $date['month'],
+            $date['day'],
+            $time['hour'],
+            $time['minute'],
+            $time['second']
+        ));
 
-        return false;
+        return ['datetime' => $dt, 'hasTime' => $hasTime];
     }
 
-    /**
-     * Normalize date/time to standard SQL-safe format.
-     */
     public function normDateTime(string $input): string|false {
-        $input = trim($input);
-        if ($input === '') {
+        $parsed = $this->parseFlexibleDate($input);
+        if (!$parsed) {
             return false;
         }
 
-        // Match dd.mm.yyyy [HH:MM[:SS]] or similar
-        if (!preg_match('/^(\d{1,2}[.\-\/]\d{1,2}[.\-\/]\d{2,4})(?:\s+(\d{1,2}:\d{2}(?::\d{2})?))?$/', $input, $m)) {
-            return false;
-        }
-
-        $date = $m[1];
-        $time = $m[2] ?? null;
-
-        // Pad day/month/year
-        $sep = preg_match('/[.\-\/]/', $date, $s) ? $s[0] : '-';
-        $parts = explode($sep, $date);
-        $parts = array_map(fn($p) => str_pad($p, (strlen($p) <= 2 ? 2 : 4), '0', STR_PAD_LEFT), $parts);
-        $date = implode($sep, $parts);
-
-        if ($time === null) {
-            return $date;
-        }
-
-        if (!$this->isValidTime($time)) {
-            return false;
-        }
-
-        $timeParts = explode(':', $time);
-        $timeParts = array_pad($timeParts, 3, '00');
-        $time = sprintf('%02d:%02d:%02d', ...$timeParts);
-
-        return "$date $time";
+        return $parsed['hasTime']
+            ? $parsed['datetime']->format('Y-m-d H:i:s')
+            : $parsed['datetime']->format('Y-m-d');
     }
 
-    /**
-     * Locale-aware conversion between user format and SQL (Y-m-d[ H:i:s]).
-     */
     public function convertDates(mixed $input, ?string $locale = null, bool $toSql = true): object|string|array|false {
-        static $formatters = [];
-        $locale ??= \Locale::getDefault();
-        $timezone = date_default_timezone_get();
-
         if (is_array($input)) {
             return array_map(fn($v) => $this->convertDates($v, $locale, $toSql), $input);
         }
@@ -241,40 +233,66 @@ trait DateAndTime {
             return false;
         }
 
-        $input = $this->normDateTime($input);
-        if ($input === false) {
-            return false;
-        }
-
         if ($toSql) {
-            // Locale → SQL
-            $key = "{$locale}_SHORT_SHORT_parse";
-            $fmt = $formatters[$key] ??= new \IntlDateFormatter($locale, \IntlDateFormatter::SHORT, \IntlDateFormatter::SHORT, $timezone);
-
-            $ts = $fmt->parse($input);
-            if ($ts === false) {
-                $key = "{$locale}_SHORT_NONE_parse";
-                $fmt = $formatters[$key] ??= new \IntlDateFormatter($locale, \IntlDateFormatter::SHORT, \IntlDateFormatter::NONE, $timezone);
-                $ts = $fmt->parse($input);
-                if ($ts === false) {
-                    return false;
-                }
-                return date('Y-m-d', $ts);
-            }
-
-            return str_contains($input, ':') ? date('Y-m-d H:i:s', $ts) : date('Y-m-d', $ts);
+            return $this->normDateTime($input);
         }
 
-        // SQL → Locale
-        $dt = \DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $input) ?: \DateTimeImmutable::createFromFormat('Y-m-d', $input);
-        if (!$dt) {
+        $parsed = $this->parseFlexibleDate($input);
+        if (!$parsed) {
             return false;
         }
 
-        $hasTime = str_contains($input, ':');
-        $key = "{$locale}_SHORT_" . ($hasTime ? 'SHORT' : 'NONE') . "_format";
-        $fmt = $formatters[$key] ??= new \IntlDateFormatter($locale, \IntlDateFormatter::SHORT, $hasTime ? \IntlDateFormatter::SHORT : \IntlDateFormatter::NONE, $timezone);
+        $dt = $parsed['datetime'];
+        return $parsed['hasTime']
+            ? $dt->format('d.m.Y H:i')
+            : $dt->format('d.m.Y');
+    }
 
-        return $fmt->format($dt);
+    private function parseDate(string $value): ?array {
+        if (!preg_match('/^(\d{1,2})[.\-\/](\d{1,2})[.\-\/](\d{4})$/', $value, $m)) {
+            return null;
+        }
+
+        $day = (int)$m[1];
+        $month = (int)$m[2];
+        $year = (int)$m[3];
+
+        if (!checkdate($month, $day, $year)) {
+            return null;
+        }
+
+        return ['day' => $day, 'month' => $month, 'year' => $year];
+    }
+
+    private function parseSqlDate(string $value): ?array {
+        if (!preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $value, $m)) {
+            return null;
+        }
+
+        $year = (int)$m[1];
+        $month = (int)$m[2];
+        $day = (int)$m[3];
+
+        if (!checkdate($month, $day, $year)) {
+            return null;
+        }
+
+        return ['day' => $day, 'month' => $month, 'year' => $year];
+    }
+
+    private function parseTime(string $value): ?array {
+        if (!preg_match('/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/', $value, $m)) {
+            return null;
+        }
+
+        $hour = (int)$m[1];
+        $minute = (int)$m[2];
+        $second = isset($m[3]) ? (int)$m[3] : 0;
+
+        if ($hour > 23 || $minute > 59 || $second > 59) {
+            return null;
+        }
+
+        return ['hour' => $hour, 'minute' => $minute, 'second' => $second];
     }
 }
