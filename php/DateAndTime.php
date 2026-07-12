@@ -220,7 +220,7 @@ trait DateAndTime {
     /**
      * Locale-aware conversion between user format and SQL (Y-m-d[ H:i:s]).
      */
-    public function convertDates(mixed $input, ?string $locale = null, bool $toSql = true): string|array|false {
+    public function convertDates(mixed $input, ?string $locale = null, bool $toSql = true): object|string|array|false {
         static $formatters = [];
         $locale ??= \Locale::getDefault();
         $timezone = date_default_timezone_get();
