@@ -107,7 +107,6 @@ class LoginUser {
             return ["success" => true, 'reason' => 'logged'];
         }
         $auth = new Auth($this->db);
-
         $result = $auth->login($username, $password);
         if (!$result['success']) {
             return $result;
