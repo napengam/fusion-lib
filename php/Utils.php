@@ -1,12 +1,13 @@
 <?php
+
 declare(strict_types=1);
 
 use DateTime;
 use Exception;
 use IntlDateFormatter;
 
-class Utils
-{
+class Utils {
+
     /**
      * Recursively returns a sanitized copy of the input data
      * without modifying the original input.
@@ -14,47 +15,66 @@ class Utils
      * @param mixed $data Object, array, or scalar
      * @return mixed Sanitized version of the input
      */
-    public static function clean($data)
-    {
-        if (is_string($data)) {
-            return htmlentities($data, ENT_QUOTES, 'UTF-8');
+    public static function clean(mixed $data, array $ignoreKeys = []): mixed {
+        static $depth = 0;
+        if ($depth > 50) {
+            return $data;
         }
-
-        if (is_array($data)) {
-            $cleaned = [];
-            foreach ($data as $key => $value) {
-                $cleaned[$key] = self::clean($value);
+        $depth++;
+        try {
+            if (is_string($data)) {
+                return htmlspecialchars($data, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8', false);
             }
-            return $cleaned;
-        }
+            if (is_array($data)) {
+                $cleaned = [];
+                foreach ($data as $key => $value) {
+                    if (in_array($key, $ignoreKeys, true)) {
+                        // escaping this field completely
+                        $cleaned[$key] = $value;
+                        continue;
+                    }
 
-        if ($data instanceof ArrayObject) {
-            $copy = new ArrayObject();
-            foreach ($data as $key => $value) {
-                $copy[$key] = self::clean($value);
+                    $cleaned[$key] = self::clean($value, $ignoreKeys);
+                }
+                return $cleaned;
+           }
+            if ($data instanceof ArrayObject) {
+                $copy = new ArrayObject();
+                foreach ($data as $key => $value) {
+                    if (in_array($key, $ignoreKeys, true)) {
+                        $copy[$key] = $value;
+                        continue;
+                    }
+                    $copy[$key] = self::clean($value, $ignoreKeys);
+                }
+                return $copy;
             }
-            return $copy;
-        }
-
-        if (is_object($data)) {
-            $cleaned = clone $data;
-            foreach (get_object_vars($cleaned) as $key => $value) {
-                $cleaned->$key = self::clean($value);
+            if (is_object($data)) {
+                if ($data instanceof \DateTimeInterface) {
+                    return $data;
+                }
+                $cleaned = clone $data;
+                foreach (get_object_vars($cleaned) as $key => $value) {
+                    if (in_array($key, $ignoreKeys, true)) {
+                        $cleaned->$key = $value;
+                        continue;
+                    }
+                    $cleaned->$key = self::clean($value, $ignoreKeys);
+                }
+                return $cleaned;
             }
-            return $cleaned;
+            return $data;
+        } finally {
+            $depth--;
         }
-
-        return $data;
     }
-
     /**
      * Recursively decode htmlentities.
      *
      * @param mixed $data
      * @return mixed Decoded version
      */
-    public static function decode($data)
-    {
+    public static function decode($data) {
         if (is_string($data)) {
             return html_entity_decode($data, ENT_QUOTES, 'UTF-8');
         }
@@ -92,8 +112,7 @@ class Utils
      * @param array $options
      * @return array
      */
-    private static function buildLookupArrays(array $options): array
-    {
+    private static function buildLookupArrays(array $options): array {
         $valueToText = [];
         $textToValue = [];
 
@@ -115,20 +134,17 @@ class Utils
         ];
     }
 
-    public static function value2Text($value, array $options): ?string
-    {
+    public static function value2Text($value, array $options): ?string {
         $lookups = self::buildLookupArrays($options);
         return $lookups['valueToText'][$value] ?? null;
     }
 
-    public static function text2Value(string $text, array $options): ?string
-    {
+    public static function text2Value(string $text, array $options): ?string {
         $lookups = self::buildLookupArrays($options);
         return $lookups['textToValue'][$text] ?? null;
     }
 
-    public static function gDate($d)
-    {
+    public static function gDate($d) {
         if ($d) {
             return date('d.m.Y', strtotime($d));
         }
@@ -136,13 +152,11 @@ class Utils
         return $d;
     }
 
-    public static function datum($d)
-    {
+    public static function datum($d) {
         return self::gDate($d);
     }
 
-    public static function getLocale()
-    {
+    public static function getLocale() {
         $browserLang = $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? 'en_US';
 
         if (class_exists('Locale')) {
@@ -152,8 +166,7 @@ class Utils
         return 'en_US';
     }
 
-    public static function convertSqlToLocal(array|object $row, array $dateFields, string $locale): array|object
-    {
+    public static function convertSqlToLocal(array|object $row, array $dateFields, string $locale): array|object {
         static $formatters = [];
 
         $isArray = is_array($row);
@@ -212,8 +225,7 @@ class Utils
         return $row;
     }
 
-    public static function convertLocalToSql(array $row, array $dateFields, string $locale): array
-    {
+    public static function convertLocalToSql(array $row, array $dateFields, string $locale): array {
         static $formatters = [];
 
         foreach ($dateFields as $field => $type) {
@@ -255,8 +267,7 @@ class Utils
         return $row;
     }
 
-    public static function getInvalidDateFields(array $row, array $dateFields, string $locale): array
-    {
+    public static function getInvalidDateFields(array $row, array $dateFields, string $locale): array {
         $invalidFields = [];
         static $formatters = [];
 
@@ -271,9 +282,9 @@ class Utils
 
             if (!isset($formatters[$cacheKey])) {
                 $formatters[$cacheKey] = new IntlDateFormatter(
-                    $locale,
-                    $isTimeOnly ? IntlDateFormatter::NONE : IntlDateFormatter::SHORT,
-                    $isDateOnly ? IntlDateFormatter::NONE : IntlDateFormatter::SHORT
+                        $locale,
+                        $isTimeOnly ? IntlDateFormatter::NONE : IntlDateFormatter::SHORT,
+                        $isDateOnly ? IntlDateFormatter::NONE : IntlDateFormatter::SHORT
                 );
                 $formatters[$cacheKey]->setLenient(false);
             }
@@ -289,8 +300,7 @@ class Utils
         return $invalidFields;
     }
 
-    public static function diffRecord(array|object $newRecord, array|object $oldRecord, array $ignoreFields = []): array
-    {
+    public static function diffRecord(array|object $newRecord, array|object $oldRecord, array $ignoreFields = []): array {
         $new = is_object($newRecord) ? (array) $newRecord : $newRecord;
         $old = is_object($oldRecord) ? (array) $oldRecord : $oldRecord;
 
