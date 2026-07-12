@@ -187,10 +187,6 @@ class Auth {
       HELPERS
       ========================= */
 
-    private function normalizeUsername(string $username): string {
-        return strtolower(trim($username));
-    }
-
     private function getClientIp(): string {
         return $_SERVER['REMOTE_ADDR'] ?? 'unknown';
     }
