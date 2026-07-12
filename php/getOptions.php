@@ -1,4 +1,39 @@
 <?php
+/**
+ * Class GetOptions
+ *
+ * WHAT:
+ * Lightweight configuration loader for CLI applications.
+ *
+ * Combines:
+ * - Command line arguments (argv)
+ * - INI configuration file
+ *
+ * into one unified configuration array.
+ *
+ * HOW:
+ * - Parses CLI arguments manually from $argv
+ * - Supports key-value options (e.g. -logfile app.log)
+ * - Supports boolean flags (e.g. -console)
+ * - Loads an INI file (default: ini.ini or via -i option)
+ * - Merges CLI options over INI values (CLI overrides take priority)
+ *
+ * DESIGN:
+ * - Deterministic and simple parsing (no getopt dependency)
+ * - Only predefined options are accepted (whitelist via $expected)
+ * - Fails early if config file is missing or invalid
+ * - Returns a flat associative array for easy consumption
+ *
+ * NOTES:
+ * - CLI options must be passed as: -key value OR -flag
+ * - Option names are normalized without leading "-"
+ * - INI file is parsed using INI_SCANNER_TYPED (preserves types)
+ *
+ * USE CASES:
+ * - CLI scripts
+ * - cron jobs
+ * - small tools needing config + runtime overrides
+ */
 
 class GetOptions {
 
