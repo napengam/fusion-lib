@@ -1,4 +1,5 @@
 <?php
+
 /**
  * httpRequest trait provides robust HTTP request handling with:
  * - Automatic request method validation (GET, POST, PUT, DELETE)
@@ -67,10 +68,14 @@ trait httpRequest {
         $this->param = (object) array_merge((array) $this->param, $data);
 
         // CSRF check (typically only for POST in browser contexts)
-        if ($method === 'POST' && property_exists($this->param, 'csrf')) {
-            if (session_status() === PHP_SESSION_NONE) {
-                session_start();
+        if ($method === 'POST') {
+            if (empty($this->param->csrf)) {
+                http_response_code(403);
+                $this->param->error = 'Missing CSRF token.';
+                echo $this->closeRequest($this->param);
+                exit;
             }
+
             if (!isset($_SESSION['csrf_token']) || $this->param->csrf !== $_SESSION['csrf_token']) {
                 http_response_code(403);
                 $this->param->error = 'Invalid CSRF token.';
@@ -93,7 +98,7 @@ trait httpRequest {
             $param->result = '';
         }
 
-       
+
         // Prepare JSON response
         $json = json_encode(
                 $param,
