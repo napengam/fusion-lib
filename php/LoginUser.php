@@ -40,7 +40,7 @@ class LoginUser {
 
     public function __construct(PDODB $pdo) {
         $this->db = $pdo;
-        // Allow public (unauthenticated) routes
+// Allow public (unauthenticated) routes
         if ($this->allowPublicRoutes([
                     '/forgot.php', '/forgotSend.php', '/forgotNew.php', '/forgotSave.php'
                 ])) {
@@ -100,12 +100,13 @@ class LoginUser {
 
         global $logged_in;
         $this->verifyCsrf();
-        $this->logout();
-        session_start();
+       
         if (!empty($_SESSION['user_id'])) {
             $logged_in = true;
             return ["success" => true, 'reason' => 'logged'];
         }
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+
         $auth = new Auth($this->db);
         $result = $auth->login($username, $password);
         if (!$result['success']) {
@@ -116,11 +117,10 @@ class LoginUser {
         $user = $result['reason'];
         $_SESSION['user_id'] = $user->id;
         $_SESSION['username'] = $username;
-        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-        $_SESSION['last_activity'] = time();
         $_SESSION['email'] = $user->email;
         $_SESSION['role'] = $user->role;
         $_SESSION['home'] = $user->home;
+        $_SESSION['last_activity'] = time();
 
         if (!empty($this->authConfig['role_field'])) {
             $_SESSION['role'] = $this->getRole($username);
@@ -130,12 +130,12 @@ class LoginUser {
         return $result;
     }
 
-    public static function logout(): void {
+    public static function logout(): bool {
         if (session_status() === PHP_SESSION_ACTIVE) {
-            // Clear session array
+// Clear session array
             $_SESSION = [];
 
-            // Destroy session cookie
+// Destroy session cookie
             if (ini_get('session.use_cookies')) {
                 $params = session_get_cookie_params();
                 setcookie(
@@ -149,10 +149,12 @@ class LoginUser {
                 );
             }
 
-            // Fully destroy session
+// Fully destroy session
             session_destroy();
+            return true;
         }
-        // Optionally redirect to login or home
+// Optionally redirect to login or home
+        return false;
     }
 
     public function register($user, $passwd, $email) {

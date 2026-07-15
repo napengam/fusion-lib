@@ -86,58 +86,21 @@ class ClassLoader {
         $classMap = $map['classes'];
 
         spl_autoload_register(function ($class) use (&$classMap, $basePath, $paths, $mapFile) {
-
-            static $rebuilt = false;
-
             $entry = $classMap[$class] ?? null;
 
-            if ($entry && is_file($entry['file'])) {
-                if (filemtime($entry['file']) === $entry['mtime']) {
-                    require_once $entry['file'];
-                    return;
-                }
+            $full = $basePath . '/' . $entry;
+            if ($entry && is_file($full)) {
+                require_once $full;
+                return;
             }
 
-            if (!$rebuilt) {
-                $rebuilt = true;
-
-                $lockFile = $mapFile . '.lock';
-                $fp = fopen($lockFile, 'c');
-
-                if ($fp && flock($fp, LOCK_EX)) {
-
-                    // another request may have already rebuilt → reload map first
-                    if (is_file($mapFile)) {
-                        $map = require $mapFile;
-                        self::$mapCache = $map;
-                        $classMap = $map['classes'];
-                    }
-
-                    $entry = $classMap[$class] ?? null;
-
-                    if (!$entry || !is_file($entry['file']) || filemtime($entry['file']) !== $entry['mtime']) {
-                        // still outdated → rebuild
-                        $map = self::buildAutoloadMap($basePath, $paths, $mapFile);
-                        self::$mapCache = $map;
-                        $classMap = $map['classes'];
-                    }
-
-                    flock($fp, LOCK_UN);
-                }
-
-                if ($fp) {
-                    fclose($fp);
-                }
-
-                // retry after rebuild / reload
-                $entry = $classMap[$class] ?? null;
-                if ($entry && is_file($entry['file'])) {
-                    require_once $entry['file'];
-                    return;
-                }
+            $short = basename(str_replace('\\', '/', $class));
+            $entry = $classMap[$short] ?? null;
+            if ($entry && is_file($entry)) {
+                require_once $entry;
+                return;
             }
-
-            throw new Exception("Class '{$class}' not found or outdated.");
+            return;
         });
     }
 
@@ -153,33 +116,65 @@ class ClassLoader {
             $cpaths = $paths['classes'];
             $guiRoutes = $paths['routes'];
         }
-
-
+        $seenFiles = []; // ✅ prevent duplicate processing
+        $shortIndex = []; // ✅ track short-name conflicts
         foreach ($cpaths as $path) {
+            $fullPath = realpath("$basePath/$path");
+            if (!$fullPath || !is_dir($fullPath)) {
+                throw new Exception("Invalid path: {$path}");
+            }
             $rii = new RecursiveIteratorIterator(
-                    new RecursiveDirectoryIterator("$basePath/$path", FilesystemIterator::SKIP_DOTS)
+                    new RecursiveDirectoryIterator($fullPath, FilesystemIterator::SKIP_DOTS)
             );
             foreach ($rii as $file) {
                 if (!$file->isFile() || $file->getExtension() !== 'php') {
                     continue;
                 }
-                $filePath = str_replace('\\', '/', $file->getPathname());
-                $defs = self::extractDefinitions($filePath);
+                $realPath = $file->getRealPath();
+                $normalizedBase = rtrim(str_replace('\\', '/', realpath($basePath)), '/');
+                $normalizedFile = str_replace('\\', '/', $realPath);
+                // make relative
+                $filePath = ltrim(str_replace($normalizedBase, '', $normalizedFile), '/');
+                // skip duplicate files (symlinks etc.)
+                if (isset($seenFiles[$realPath])) {
+                    continue;
+                }
+                $seenFiles[$realPath] = true;
+                $defs = self::extractDefinitions($realPath);
                 foreach ($defs as $def) {
-                    $classes[$def] = [
-                        'file' => $filePath,
-                        'mtime' => filemtime($filePath),
-                    ];
-                    // Router: store naked class name as key
+                    // HARD FAIL on duplicate FQCN
+                    if (isset($classes[$def])) {
+                        throw new Exception(
+                                        "Duplicate class '{$def}' found in:\n" .
+                                        "- {$classes[$def]}\n" .
+                                        "- {$filePath}"
+                                );
+                    }
+                    $classes[$def] = $filePath;
+                    // short name handling (safe)
                     $short = basename(str_replace('\\', '/', $def));
-                    $found = array_filter($guiRoutes, function ($p) use ($filePath){
-                        return strpos($filePath, $p) !== false;
-                    });
-                    if ($found) {
-                        $routes[$short] = $filePath;
+                    if (!isset($shortIndex[$short])) {
+                        $shortIndex[$short] = $def;
+                    } else {
+                        // conflict → remove both from short mapping
+                        unset($routes[$short]);
+                        $shortIndex[$short] = false;
+                    }
+                    // router mapping (only if not conflicted)
+                    if ($shortIndex[$short] !== false) {
+                        $found = array_filter($guiRoutes, function ($p) use ($filePath) {
+                            return strpos($filePath, $p) !== false;
+                        });
+                        if ($found) {
+                            $routes[$short] = $filePath;
+                        }
                     }
                 }
             }
+        }
+        //  sanity check
+        if (empty($classes)) {
+            throw new Exception("Autoload map is empty — no classes found.");
         }
         ksort($classes);
         ksort($routes);
@@ -207,41 +202,63 @@ class ClassLoader {
         if (!is_file($file) || pathinfo($file, PATHINFO_EXTENSION) !== 'php') {
             return [];
         }
+
         $contents = file_get_contents($file);
         $tokens = token_get_all($contents);
+
         $defs = [];
         $namespace = '';
-        for ($i = 0; $i < count($tokens); $i++) {
+
+        $count = count($tokens);
+
+        for ($i = 0; $i < $count; $i++) {
+
             if (!is_array($tokens[$i])) {
                 continue;
             }
-            // Capture namespace
+
+            // -------------------------
+            // NAMESPACE
+            // -------------------------
             if ($tokens[$i][0] === T_NAMESPACE) {
                 $namespace = '';
-                for ($j = $i + 1; $j < count($tokens); $j++) {
-                    if (is_array($tokens[$j]) &&
-                            ($tokens[$j][0] === T_STRING || $tokens[$j][0] === T_NAME_QUALIFIED)) {
-                        $namespace .= $tokens[$j][1];
-                    } elseif ($tokens[$j] === ';' || $tokens[$j] === '{') {
-                        break;
-                    }
+                $i++;
+
+                while (isset($tokens[$i]) && is_array($tokens[$i]) &&
+                in_array($tokens[$i][0], [T_STRING, T_NS_SEPARATOR, T_NAME_QUALIFIED], true)
+                ) {
+                    $namespace .= $tokens[$i][1];
+                    $i++;
                 }
             }
-            // Capture class/interface/trait
-            if (in_array($tokens[$i][0], [T_CLASS, T_INTERFACE, T_TRAIT], true)) {
+
+            // -------------------------
+            // CLASS / INTERFACE / TRAIT / ENUM
+            // -------------------------
+            if (in_array($tokens[$i][0], [T_CLASS, T_INTERFACE, T_TRAIT, T_ENUM], true)) {
+
+                // skip anonymous class
                 $prev = $tokens[$i - 1] ?? null;
                 if ($tokens[$i][0] === T_CLASS && is_array($prev) && $prev[0] === T_NEW) {
-                    continue; // Skip anonymous
+                    continue;
                 }
-                for ($j = $i + 1; $j < count($tokens); $j++) {
-                    if (is_array($tokens[$j]) && $tokens[$j][0] === T_STRING) {
-                        $name = $tokens[$j][1];
-                        $defs[] = ($namespace ? $namespace . '\\' : '') . $name;
-                        break;
-                    }
+
+                $i++;
+
+                // skip whitespace
+                while (isset($tokens[$i]) && is_array($tokens[$i]) &&
+                $tokens[$i][0] === T_WHITESPACE) {
+                    $i++;
+                }
+
+                if (isset($tokens[$i]) && is_array($tokens[$i]) && $tokens[$i][0] === T_STRING) {
+                    $name = $tokens[$i][1];
+
+                    $defs[] = $namespace ? $namespace . '\\' . $name : $name;
                 }
             }
         }
+
         return $defs;
     }
 
@@ -260,7 +277,7 @@ class ClassLoader {
         $dir = dirname($file);
         if (!is_dir($dir)) {
             mkdir($dir, 0775, true);
-    }
+        }
 
         // write complete file first
         file_put_contents($tmpFile, $content, LOCK_EX);
