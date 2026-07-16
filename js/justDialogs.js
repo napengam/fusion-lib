@@ -82,9 +82,9 @@ function justDialogs(language = 'de') {
         let startTop = 0;
 
         handle.style.cursor = 'grab';
+        handle.style.touchAction = 'none'; // prevent scroll/gesture conflicts on touch
 
         handle.addEventListener('pointerdown', (e) => {
-
             if (e.target.closest('.fusion-dialog-close')) {
                 return;
             }
@@ -107,22 +107,37 @@ function justDialogs(language = 'de') {
 
             document.addEventListener('pointermove', onMove);
             document.addEventListener('pointerup', onUp);
+            document.addEventListener('pointercancel', onUp);
         });
 
         function onMove(e) {
             const dx = e.clientX - startX;
             const dy = e.clientY - startY;
 
-            dialog.style.left = startLeft + dx + 'px';
-            dialog.style.top = startTop + dy + 'px';
+            let newLeft = startLeft + dx;
+            let newTop = startTop + dy;
+
+            const maxLeft = Math.max(window.innerWidth - dialog.offsetWidth, 0);
+            const maxTop = Math.max(window.innerHeight - dialog.offsetHeight, 0);
+
+            newLeft = Math.min(Math.max(newLeft, 0), maxLeft);
+            newTop = Math.min(Math.max(newTop, 0), maxTop);
+
+            dialog.style.left = newLeft + 'px';
+            dialog.style.top = newTop + 'px';
         }
 
         function onUp(e) {
-            handle.releasePointerCapture(e.pointerId);
+            try {
+                handle.releasePointerCapture(e.pointerId);
+            } catch (err) {
+                /* pointer may already be released */
+            }
             handle.style.cursor = 'grab';
 
             document.removeEventListener('pointermove', onMove);
             document.removeEventListener('pointerup', onUp);
+            document.removeEventListener('pointercancel', onUp);
         }
     }
 
@@ -321,6 +336,21 @@ function justDialogs(language = 'de') {
             setTimeout(() => d.dlg.close(), 3500);
     }
     }
+    function myEmptyDialog(text, fade = false) {
+        const d = dialogFactory.create('inform', {
+            title: '',
+            footer: ''
+        });
+
+        d.body.innerHTML = text;
+        dialogFactory.show(d, false);
+
+        if (fade) {
+            d.wrap.classList.add('fusion-fade');
+            setTimeout(() => d.dlg.close(), 3500);
+    }
+    }
+
     function myCommentEditor(text, anchorEl, save) {
         const d = dialogFactory.create('comment', {
             title: 'Comment',
@@ -441,6 +471,7 @@ function justDialogs(language = 'de') {
         myPrompt,
         myLogin,
         myInform,
+        myEmptyDialog,
         myCommentEditor,
         myCommentViewer,
         myUpload,
