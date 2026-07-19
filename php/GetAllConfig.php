@@ -46,7 +46,7 @@ final class GetAllConfig {
             return;
         }
 
-        // 🔍 find nearest .env going upwards
+        // find nearest .env going upwards
         $envBase = self::findUpwards($startDir, '.env');
 
         if ($envBase === null) {
@@ -70,6 +70,7 @@ final class GetAllConfig {
         }
 
         foreach ($files as $file) {
+           
             self::loadEnv($file);
         }
 
@@ -97,7 +98,7 @@ final class GetAllConfig {
         if (!is_file($file)) {
             return;
         }
-
+        self::validateEnvFile($file);
         $lines = file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
 
         if ($lines === false) {
@@ -203,9 +204,9 @@ final class GetAllConfig {
         $url = self::detectUrl($projectRoot);
 
         return str_replace(
-            ['__DOCUMENT_ROOT__', '__PROJECT_ROOT__', '__URL__'],
-            [$documentRoot, $projectRoot, $url],
-            $raw
+                ['__DOCUMENT_ROOT__', '__PROJECT_ROOT__', '__URL__'],
+                [$documentRoot, $projectRoot, $url],
+                $raw
         );
     }
 
@@ -215,9 +216,9 @@ final class GetAllConfig {
         }
 
         $https = (
-            (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ||
-            ($_SERVER['SERVER_PORT'] ?? 80) == 443 ||
-            ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https'
+                (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ||
+                ($_SERVER['SERVER_PORT'] ?? 80) == 443 ||
+                ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https'
         );
 
         $scheme = $https ? 'https://' : 'http://';
@@ -284,5 +285,42 @@ final class GetAllConfig {
         }
 
         return $value;
+    }
+
+    private static function validateEnvFile(string $file): void {
+        if (!is_file($file)) {
+            return;
+        }
+        $lines = file($file, FILE_IGNORE_NEW_LINES);
+        if ($lines === false) {
+            throw new RuntimeException("Cannot read .env file");
+        }
+        foreach ($lines as $i => $line) {
+            $lineNumber = $i + 1;
+            $line = trim($line);
+            if ($line === '' || str_starts_with($line, '#')) {
+                continue;
+            }
+            if (!str_contains($line, '=')) {
+                throw new RuntimeException(".env syntax error on line {$lineNumber}: missing '='");
+            }
+            [$key, $value] = explode('=', $line, 2);
+            $key = trim($key);
+            $value = trim($value);
+            // key format check
+            if (!preg_match('/^[A-Z0-9_]+$/i', $key)) {
+                throw new RuntimeException(".env invalid key '{$key}' on line {$lineNumber}");
+            }
+            //  detect unclosed quotes
+            $singleQuotes = substr_count($value, "'");
+            $doubleQuotes = substr_count($value, '"');
+            if ($singleQuotes % 2 !== 0 || $doubleQuotes % 2 !== 0) {
+                throw new RuntimeException(".env unclosed quote on line {$lineNumber}");
+            }
+            //  optional: warn about suspicious multiline values
+            if (str_contains($value, "\n")) {
+                throw new RuntimeException(".env multiline value detected on line {$lineNumber}");
+            }
+        }
     }
 }

@@ -12,6 +12,7 @@
                 <section class="section">
                     <p id="out"><b>&nbsp;</b></p> 
                     <div style="margin-left:20px">                    
+                        <button  class="button has-background-light" onclick='theDialogs.myEmptyDialog("Empty<br><b>Dialog")'>Just show some information</button>
                         <button  class="button has-background-light" onclick='theDialogs.myInform("Informatione Grande non modal", true)'>Just show some information</button>
                         <button  class="button has-background-light"  onclick='theDialogs.myLogin("Please Log In", save, no)'>Login Dialog</button>
                         <button  class="button has-background-light"  onclick='theDialogs.myAlert("The Alert box\nYou made it csaaaaaaaaaaaaaaaaaaaaa aaa!")'>Show Alert Box</button>
