@@ -85,7 +85,7 @@ class ClassLoader {
         self::$mapCache = $map;
         $classMap = $map['classes'];
 
-        spl_autoload_register(function ($class) use (&$classMap, $basePath, $paths, $mapFile) {
+        spl_autoload_register(function ($class) use ($classMap, $basePath) {
             $entry = $classMap[$class] ?? null;
 
             $full = $basePath . '/' . $entry;
